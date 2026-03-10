@@ -6,6 +6,11 @@ import tls from 'tls'
 
 const execAsync = promisify(exec)
 
+// Custom health-check paths for domains where "/" returns non-2xx
+const CUSTOM_CHECK_PATHS: Record<string, string> = {
+  'api.pellwood.com': '/order',
+}
+
 export interface SiteStatus {
   domain: string
   httpStatus: number | null
@@ -37,18 +42,19 @@ export async function getNginxDomains(): Promise<string[]> {
 function checkHttp(domain: string): Promise<{ status: number | null; time: number; error: string | null }> {
   return new Promise((resolve) => {
     const start = Date.now()
+    const path = CUSTOM_CHECK_PATHS[domain] || '/'
     const req = https.get(
-      `https://${domain}`,
+      `https://${domain}${path}`,
       { timeout: 10000, rejectUnauthorized: false },
       (res) => {
         resolve({ status: res.statusCode ?? null, time: Date.now() - start, error: null })
         res.resume()
       }
     )
-    req.on('error', (err) => {
+    req.on('error', () => {
       // Try HTTP fallback
       const reqHttp = http.get(
-        `http://${domain}`,
+        `http://${domain}${path}`,
         { timeout: 10000 },
         (res) => {
           resolve({ status: res.statusCode ?? null, time: Date.now() - start, error: null })
@@ -89,11 +95,11 @@ function checkSSL(domain: string): Promise<SiteStatus['ssl']> {
 
             resolve({
               valid: authorized && daysLeft > 0,
-              issuer: cert.issuer?.O || cert.issuer?.CN || 'Unknown',
+              issuer: String(cert.issuer?.O || cert.issuer?.CN || 'Unknown'),
               notBefore: notBefore.toISOString(),
               notAfter: notAfter.toISOString(),
               daysLeft,
-              error: authorized ? null : (socket.authorizationError || 'Certificate not trusted'),
+              error: authorized ? null : String(socket.authorizationError || 'Certificate not trusted'),
             })
           } else {
             resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: 'No certificate' })
