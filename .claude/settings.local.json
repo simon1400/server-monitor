@@ -43,7 +43,8 @@
       "Bash(ssh root@157.90.169.205 'ps aux --no-headers | awk \"\"{arr[\\\\$11]+=\\\\$6} END {for \\(a in arr\\) printf \\\\\"\"%10d KB  %s\\\\n\\\\\"\", arr[a], a}\"\" | sort -rn | head -20')",
       "Bash(ssh root@157.90.169.205 \"ps aux --no-headers --sort=-%mem | head -30 | awk ''{printf \"\"%10s MB  %s %s %s\\\\n\"\", sprintf\\(\"\"%.0f\"\",$6/1024\\), $11, $12, $13}''\")",
       "Bash(ssh root@157.90.169.205:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

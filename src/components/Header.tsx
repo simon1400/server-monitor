@@ -1,4 +1,5 @@
 import { Monitor, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { NavLink } from 'react-router'
 import { formatDistanceToNow } from 'date-fns'
 
 interface HeaderProps {
@@ -9,16 +10,44 @@ interface HeaderProps {
   processCount: number
 }
 
+const navItems = [
+  { to: '/', label: 'Overview' },
+  { to: '/sites', label: 'Sites' },
+  { to: '/disk', label: 'Disk' },
+  { to: '/processes', label: 'Processes' },
+]
+
 export default function Header({ lastUpdate, loading, error, onRefresh, processCount }: HeaderProps) {
   return (
     <header className="bg-bg-secondary/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Monitor className="w-6 h-6 text-accent-blue" />
-          <div>
-            <h1 className="text-lg font-bold text-text-primary">Server Monitor</h1>
-            <p className="text-xs text-text-muted">{processCount} processes</p>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <Monitor className="w-6 h-6 text-accent-blue" />
+            <div>
+              <h1 className="text-lg font-bold text-text-primary">Server Monitor</h1>
+              <p className="text-xs text-text-muted">{processCount} processes</p>
+            </div>
           </div>
+
+          <nav className="flex items-center gap-1">
+            {navItems.map(({ to, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-accent-blue/15 text-accent-blue'
+                      : 'text-text-muted hover:text-text-primary hover:bg-bg-card-hover'
+                  }`
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
 
         <div className="flex items-center gap-4">

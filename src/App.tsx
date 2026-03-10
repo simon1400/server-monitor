@@ -1,11 +1,10 @@
+import { Routes, Route } from 'react-router'
 import { useMonitor } from './hooks/useMonitor'
 import Header from './components/Header'
-import SystemOverview from './components/SystemOverview'
-import SystemChart from './components/SystemChart'
-import ProcessList from './components/ProcessList'
-import SitesStatus from './components/SitesStatus'
-import StaticSites from './components/StaticSites'
-import DiskUsage from './components/DiskUsage'
+import OverviewPage from './pages/OverviewPage'
+import SitesPage from './pages/SitesPage'
+import DiskPage from './pages/DiskPage'
+import ProcessesPage from './pages/ProcessesPage'
 import { Loader2 } from 'lucide-react'
 
 function App() {
@@ -54,18 +53,12 @@ function App() {
         processCount={data.processes.length}
       />
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <SystemOverview system={data.system} />
-        <SitesStatus />
-        <StaticSites />
-        <DiskUsage />
-        <SystemChart />
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-text-primary mb-1">PM2 Processes</h2>
-          <p className="text-sm text-text-muted">
-            Total memory: {(data.processes.reduce((sum, p) => sum + p.memory, 0) / 1024 / 1024 / 1024).toFixed(2)} GB
-          </p>
-        </div>
-        <ProcessList processes={data.processes} onAction={refresh} />
+        <Routes>
+          <Route path="/" element={<OverviewPage data={data} />} />
+          <Route path="/sites" element={<SitesPage />} />
+          <Route path="/disk" element={<DiskPage />} />
+          <Route path="/processes" element={<ProcessesPage data={data} onAction={refresh} />} />
+        </Routes>
       </main>
     </div>
   )
