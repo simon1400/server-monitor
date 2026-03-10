@@ -8,7 +8,6 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 4400,
-        AUTH_PASSWORD: 'CHANGE_ME',
       },
       watch: false,
       max_memory_restart: '200M',
