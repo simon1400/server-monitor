@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react'
 import { Routes, Route } from 'react-router'
 import { useMonitor } from './hooks/useMonitor'
 import Header from './components/Header'
@@ -5,9 +6,10 @@ import OverviewPage from './pages/OverviewPage'
 import SitesPage from './pages/SitesPage'
 import DiskPage from './pages/DiskPage'
 import ProcessesPage from './pages/ProcessesPage'
+import LoginPage from './components/LoginPage'
 import { Loader2 } from 'lucide-react'
 
-function App() {
+function Dashboard() {
   const { data, loading, error, lastUpdate, refresh } = useMonitor(5000)
 
   if (loading && !data) {
@@ -62,6 +64,36 @@ function App() {
       </main>
     </div>
   )
+}
+
+function App() {
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null)
+
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/check')
+      const json = await res.json()
+      setAuthenticated(json.authenticated)
+    } catch {
+      setAuthenticated(false)
+    }
+  }, [])
+
+  useEffect(() => { checkAuth() }, [checkAuth])
+
+  if (authenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-accent-blue animate-spin" />
+      </div>
+    )
+  }
+
+  if (!authenticated) {
+    return <LoginPage onLogin={() => setAuthenticated(true)} />
+  }
+
+  return <Dashboard />
 }
 
 export default App

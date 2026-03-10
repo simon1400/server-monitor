@@ -6,6 +6,7 @@ import { getPM2Processes, getPM2Logs, restartProcess, stopProcess } from './pm2.
 import { getSystemInfo, getSystemHistory, startSystemHistoryCollection } from './system.js'
 import { checkAllSites, getStaticSites, getDiskUsage } from './sites.js'
 import { deployProcess } from './deploy.js'
+import { authMiddleware, login, logout, checkAuth } from './auth.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -18,6 +19,14 @@ app.use(express.json())
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '..', 'dist')))
 }
+
+// Auth routes (before middleware)
+app.post('/api/login', login)
+app.post('/api/logout', logout)
+app.get('/api/auth/check', checkAuth)
+
+// Auth middleware
+app.use(authMiddleware)
 
 // API routes
 app.get('/api/monitor', async (_req, res) => {
