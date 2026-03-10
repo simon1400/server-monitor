@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { HardDrive, FolderOpen, Server, Package } from 'lucide-react'
+import { HardDrive, FolderOpen, Server, Package, Loader2 } from 'lucide-react'
 
 interface DiskUsageEntry {
   name: string
@@ -70,7 +70,21 @@ export default function DiskUsage() {
     return () => clearInterval(id)
   }, [fetchData])
 
-  if (loading && !data) return null
+  if (loading && !data) {
+    return (
+      <div className="bg-bg-card rounded-xl border border-border p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <HardDrive className="w-5 h-5 text-accent-cyan" />
+          <h2 className="text-lg font-semibold">Disk Usage Breakdown</h2>
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <Loader2 className="w-6 h-6 text-accent-cyan animate-spin" />
+          <p className="text-sm text-text-muted">Scanning disk usage...</p>
+          <p className="text-xs text-text-muted">This may take a moment</p>
+        </div>
+      </div>
+    )
+  }
   if (!data || data.entries.length === 0) return null
 
   const projects = data.entries.filter(e => e.category === 'project')
