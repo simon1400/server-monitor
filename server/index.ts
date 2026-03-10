@@ -2,9 +2,9 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { getPM2Processes, getPM2Logs, restartProcess, stopProcess, deleteProcess } from './pm2.js'
+import { getPM2Processes, getPM2Logs, restartProcess, stopProcess } from './pm2.js'
 import { getSystemInfo, getSystemHistory, startSystemHistoryCollection } from './system.js'
-import { checkAllSites, getStaticSites } from './sites.js'
+import { checkAllSites, getStaticSites, getDiskUsage } from './sites.js'
 import { deployProcess } from './deploy.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -114,6 +114,16 @@ app.get('/api/static-sites', async (_req, res) => {
     res.status(500).json({ error: 'Failed to fetch static sites' })
   }
 })
+
+app.get('/api/disk-usage', async (_req, res) => {
+  try {
+    const usage = await getDiskUsage()
+    res.json(usage)
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch disk usage' })
+  }
+})
+
 
 // Catch-all for SPA in production
 if (process.env.NODE_ENV === 'production') {

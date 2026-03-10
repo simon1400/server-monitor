@@ -167,6 +167,59 @@ export async function getStaticSites(): Promise<StaticSite[]> {
   }
 }
 
+export interface DiskUsageEntry {
+  name: string
+  path: string
+  size: string
+  bytes: number
+}
+
+let cachedDiskUsage: DiskUsageEntry[] = []
+let lastDiskCheck = 0
+
+export async function getDiskUsage(): Promise<DiskUsageEntry[]> {
+  // Cache for 5 minutes (disk usage doesn't change often)
+  if (Date.now() - lastDiskCheck < 300000 && cachedDiskUsage.length > 0) {
+    return cachedDiskUsage
+  }
+
+  try {
+    // Get all directories in /opt/ with their sizes
+    const { stdout } = await execAsync('du -sb /opt/*/ 2>/dev/null | sort -rn')
+    const entries: DiskUsageEntry[] = []
+
+    for (const line of stdout.trim().split('\n')) {
+      if (!line) continue
+      const [bytesStr, dirPath] = line.split('\t')
+      if (!bytesStr || !dirPath) continue
+
+      const bytes = parseInt(bytesStr, 10)
+      const name = dirPath.replace(/^\/opt\//, '').replace(/\/$/, '')
+      if (!name) continue
+
+      // Format human-readable size
+      let size: string
+      if (bytes >= 1024 * 1024 * 1024) {
+        size = (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
+      } else if (bytes >= 1024 * 1024) {
+        size = (bytes / (1024 * 1024)).toFixed(0) + ' MB'
+      } else if (bytes >= 1024) {
+        size = (bytes / 1024).toFixed(0) + ' KB'
+      } else {
+        size = bytes + ' B'
+      }
+
+      entries.push({ name, path: dirPath.replace(/\/$/, ''), size, bytes })
+    }
+
+    cachedDiskUsage = entries
+    lastDiskCheck = Date.now()
+    return entries
+  } catch {
+    return cachedDiskUsage
+  }
+}
+
 let cachedSites: SiteStatus[] = []
 let lastCheck = 0
 
