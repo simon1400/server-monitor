@@ -1,11 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
-import { HardDrive, FolderOpen } from 'lucide-react'
+import { HardDrive, FolderOpen, Server, Package } from 'lucide-react'
 
 interface DiskUsageEntry {
   name: string
   path: string
   size: string
   bytes: number
+  category: 'project' | 'system' | 'other'
+}
+
+interface DiskUsageData {
+  entries: DiskUsageEntry[]
+  totalDisk: number
+  usedDisk: number
 }
 
 function formatBytes(bytes: number): string {
@@ -15,16 +22,41 @@ function formatBytes(bytes: number): string {
   return bytes + ' B'
 }
 
+function EntryRow({ entry, maxBytes, color }: { entry: DiskUsageEntry; maxBytes: number; color: string }) {
+  const pct = maxBytes > 0 ? (entry.bytes / maxBytes) * 100 : 0
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-bg-card-hover transition-colors">
+      <div className={`w-2 h-2 rounded-full ${color} shrink-0`} />
+      <span className="text-sm font-mono text-text-primary w-36 shrink-0 truncate" title={entry.path}>
+        {entry.name}
+      </span>
+      <div className="flex-1 h-1.5 bg-bg-primary rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-sm font-mono text-text-secondary w-20 text-right shrink-0">
+        {entry.size}
+      </span>
+      <span className="flex items-center gap-1 text-xs text-text-muted w-44 shrink-0 truncate" title={entry.path}>
+        <FolderOpen className="w-3 h-3 shrink-0" />
+        {entry.path}
+      </span>
+    </div>
+  )
+}
+
 export default function DiskUsage() {
-  const [entries, setEntries] = useState<DiskUsageEntry[]>([])
+  const [data, setData] = useState<DiskUsageData | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch('/api/disk-usage')
       if (!res.ok) return
-      const data = await res.json()
-      setEntries(data)
+      setData(await res.json())
     } catch {
       // ignore
     } finally {
@@ -34,83 +66,117 @@ export default function DiskUsage() {
 
   useEffect(() => {
     fetchData()
-    const id = setInterval(fetchData, 300000) // refresh every 5 min
+    const id = setInterval(fetchData, 300000)
     return () => clearInterval(id)
   }, [fetchData])
 
-  if (loading && entries.length === 0) return null
-  if (entries.length === 0) return null
+  if (loading && !data) return null
+  if (!data || data.entries.length === 0) return null
 
-  const totalBytes = entries.reduce((sum, e) => sum + e.bytes, 0)
-  const maxBytes = entries[0]?.bytes ?? 1
+  const projects = data.entries.filter(e => e.category === 'project')
+  const system = data.entries.filter(e => e.category === 'system')
 
-  // Color palette for bars
-  const colors = [
-    'bg-accent-blue', 'bg-accent-purple', 'bg-accent-cyan', 'bg-accent-green',
-    'bg-accent-yellow', 'bg-accent-red', 'bg-blue-400', 'bg-purple-400',
-    'bg-cyan-400', 'bg-green-400', 'bg-yellow-400', 'bg-red-400',
-  ]
+  const allBytes = data.entries.reduce((sum, e) => sum + e.bytes, 0)
+  const projectBytes = projects.reduce((sum, e) => sum + e.bytes, 0)
+  const systemBytes = system.reduce((sum, e) => sum + e.bytes, 0)
+  const otherBytes = data.usedDisk > 0 ? Math.max(0, data.usedDisk - allBytes) : 0
+
+  const maxProjectBytes = projects[0]?.bytes ?? 1
+  const maxSystemBytes = system[0]?.bytes ?? 1
+
+  // Stacked bar segments
+  const segments = data.usedDisk > 0 ? [
+    { label: 'Projects', bytes: projectBytes, color: 'bg-accent-blue' },
+    { label: 'System', bytes: systemBytes, color: 'bg-accent-yellow' },
+    { label: 'Other', bytes: otherBytes, color: 'bg-text-muted' },
+    { label: 'Free', bytes: data.totalDisk - data.usedDisk, color: 'bg-bg-primary' },
+  ] : []
 
   return (
     <div className="bg-bg-card rounded-xl border border-border p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <HardDrive className="w-5 h-5 text-accent-cyan" />
-          <h2 className="text-lg font-semibold">Disk Usage by Project</h2>
-          <span className="text-xs text-text-muted">/opt/</span>
+          <h2 className="text-lg font-semibold">Disk Usage Breakdown</h2>
         </div>
-        <span className="text-sm font-mono text-text-secondary">
-          Total: {formatBytes(totalBytes)}
-        </span>
+        {data.usedDisk > 0 && (
+          <span className="text-sm font-mono text-text-secondary">
+            {formatBytes(data.usedDisk)} / {formatBytes(data.totalDisk)}
+          </span>
+        )}
       </div>
 
-      {/* Stacked bar */}
-      <div className="h-6 bg-bg-primary rounded-full overflow-hidden flex mb-4">
-        {entries.map((entry, i) => {
-          const pct = (entry.bytes / totalBytes) * 100
-          if (pct < 0.5) return null
-          return (
-            <div
-              key={entry.name}
-              className={`h-full ${colors[i % colors.length]} transition-all duration-500`}
-              style={{ width: `${pct}%` }}
-              title={`${entry.name}: ${entry.size} (${pct.toFixed(1)}%)`}
-            />
-          )
-        })}
-      </div>
-
-      {/* Project list */}
-      <div className="space-y-1">
-        {entries.map((entry, i) => {
-          const pct = maxBytes > 0 ? (entry.bytes / maxBytes) * 100 : 0
-
-          return (
-            <div
-              key={entry.name}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-bg-card-hover transition-colors"
-            >
-              <div className={`w-2.5 h-2.5 rounded-full ${colors[i % colors.length]} shrink-0`} />
-              <span className="text-sm font-mono text-text-primary w-40 shrink-0 truncate">
-                {entry.name}
-              </span>
-              <div className="flex-1 h-2 bg-bg-primary rounded-full overflow-hidden">
+      {/* Overall stacked bar */}
+      {segments.length > 0 && (
+        <div className="mb-4">
+          <div className="h-5 bg-bg-primary rounded-full overflow-hidden flex">
+            {segments.map(seg => {
+              const pct = (seg.bytes / data.totalDisk) * 100
+              if (pct < 0.3) return null
+              return (
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${colors[i % colors.length]}`}
+                  key={seg.label}
+                  className={`h-full ${seg.color} transition-all duration-500`}
                   style={{ width: `${pct}%` }}
+                  title={`${seg.label}: ${formatBytes(seg.bytes)} (${pct.toFixed(1)}%)`}
                 />
-              </div>
-              <span className="text-sm font-mono text-text-secondary w-20 text-right shrink-0">
-                {entry.size}
+              )
+            })}
+          </div>
+          <div className="flex gap-4 mt-2 text-xs text-text-muted">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-blue inline-block" />
+              Projects {formatBytes(projectBytes)}
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-yellow inline-block" />
+              System {formatBytes(systemBytes)}
+            </span>
+            {otherBytes > 100 * 1024 * 1024 && (
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-text-muted inline-block" />
+                Other {formatBytes(otherBytes)}
               </span>
-              <span className="flex items-center gap-1 text-xs text-text-muted shrink-0" title={entry.path}>
-                <FolderOpen className="w-3.5 h-3.5" />
-                {entry.path}
-              </span>
-            </div>
-          )
-        })}
-      </div>
+            )}
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-bg-primary border border-border inline-block" />
+              Free {formatBytes(data.totalDisk - data.usedDisk)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Projects section */}
+      {projects.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2 px-3">
+            <Package className="w-4 h-4 text-accent-blue" />
+            <h3 className="text-sm font-semibold text-text-secondary">Projects</h3>
+            <span className="text-xs text-text-muted">/opt/ — {formatBytes(projectBytes)}</span>
+          </div>
+          <div className="space-y-0.5">
+            {projects.map(entry => (
+              <EntryRow key={entry.path} entry={entry} maxBytes={maxProjectBytes} color="bg-accent-blue" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* System section */}
+      {system.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2 px-3">
+            <Server className="w-4 h-4 text-accent-yellow" />
+            <h3 className="text-sm font-semibold text-text-secondary">System</h3>
+            <span className="text-xs text-text-muted">{formatBytes(systemBytes)}</span>
+          </div>
+          <div className="space-y-0.5">
+            {system.map(entry => (
+              <EntryRow key={entry.path} entry={entry} maxBytes={maxSystemBytes} color="bg-accent-yellow" />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

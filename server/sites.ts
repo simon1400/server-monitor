@@ -172,51 +172,78 @@ export interface DiskUsageEntry {
   path: string
   size: string
   bytes: number
+  category: 'project' | 'system' | 'other'
 }
 
-let cachedDiskUsage: DiskUsageEntry[] = []
+export interface DiskUsageResponse {
+  entries: DiskUsageEntry[]
+  totalDisk: number
+  usedDisk: number
+}
+
+let cachedDiskUsage: DiskUsageResponse | null = null
 let lastDiskCheck = 0
 
-export async function getDiskUsage(): Promise<DiskUsageEntry[]> {
-  // Cache for 5 minutes (disk usage doesn't change often)
-  if (Date.now() - lastDiskCheck < 300000 && cachedDiskUsage.length > 0) {
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(0) + ' MB'
+  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB'
+  return bytes + ' B'
+}
+
+function parseDuLines(stdout: string, category: DiskUsageEntry['category']): DiskUsageEntry[] {
+  const entries: DiskUsageEntry[] = []
+  for (const line of stdout.trim().split('\n')) {
+    if (!line) continue
+    const [bytesStr, dirPath] = line.split('\t')
+    if (!bytesStr || !dirPath) continue
+    const bytes = parseInt(bytesStr, 10)
+    if (isNaN(bytes) || bytes === 0) continue
+    const cleanPath = dirPath.replace(/\/$/, '')
+    const name = cleanPath.split('/').pop() || cleanPath
+    entries.push({ name, path: cleanPath, size: formatSize(bytes), bytes, category })
+  }
+  return entries
+}
+
+export async function getDiskUsage(): Promise<DiskUsageResponse> {
+  // Cache for 5 minutes
+  if (Date.now() - lastDiskCheck < 300000 && cachedDiskUsage) {
     return cachedDiskUsage
   }
 
   try {
-    // Get all directories in /opt/ with their sizes
-    const { stdout } = await execAsync('du -sb /opt/*/ 2>/dev/null | sort -rn')
-    const entries: DiskUsageEntry[] = []
+    // Run all du commands in parallel + get disk totals
+    const [optResult, systemResult, dfResult] = await Promise.all([
+      // Projects in /opt/
+      execAsync('du -sb /opt/*/ 2>/dev/null | sort -rn', { timeout: 30000 }),
+      // Major system directories
+      execAsync(
+        'du -sb /var/log /var/lib /var/cache /var/backups /usr /tmp /root /home /snap 2>/dev/null | sort -rn',
+        { timeout: 30000 }
+      ),
+      // Total disk info
+      execAsync("df -B1 / | tail -1 | awk '{print $2, $3}'"),
+    ])
 
-    for (const line of stdout.trim().split('\n')) {
-      if (!line) continue
-      const [bytesStr, dirPath] = line.split('\t')
-      if (!bytesStr || !dirPath) continue
+    const entries: DiskUsageEntry[] = [
+      ...parseDuLines(optResult.stdout, 'project'),
+      ...parseDuLines(systemResult.stdout, 'system'),
+    ]
 
-      const bytes = parseInt(bytesStr, 10)
-      const name = dirPath.replace(/^\/opt\//, '').replace(/\/$/, '')
-      if (!name) continue
+    // Sort all by size descending
+    entries.sort((a, b) => b.bytes - a.bytes)
 
-      // Format human-readable size
-      let size: string
-      if (bytes >= 1024 * 1024 * 1024) {
-        size = (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
-      } else if (bytes >= 1024 * 1024) {
-        size = (bytes / (1024 * 1024)).toFixed(0) + ' MB'
-      } else if (bytes >= 1024) {
-        size = (bytes / 1024).toFixed(0) + ' KB'
-      } else {
-        size = bytes + ' B'
-      }
+    // Parse df output for total/used
+    const [totalStr, usedStr] = dfResult.stdout.trim().split(/\s+/)
+    const totalDisk = parseInt(totalStr, 10) || 0
+    const usedDisk = parseInt(usedStr, 10) || 0
 
-      entries.push({ name, path: dirPath.replace(/\/$/, ''), size, bytes })
-    }
-
-    cachedDiskUsage = entries
+    cachedDiskUsage = { entries, totalDisk, usedDisk }
     lastDiskCheck = Date.now()
-    return entries
-  } catch {
     return cachedDiskUsage
+  } catch {
+    return cachedDiskUsage || { entries: [], totalDisk: 0, usedDisk: 0 }
   }
 }
 
