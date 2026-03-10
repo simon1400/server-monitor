@@ -4,7 +4,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { getPM2Processes, getPM2Logs, restartProcess, stopProcess, deleteProcess } from './pm2.js'
 import { getSystemInfo, getSystemHistory, startSystemHistoryCollection } from './system.js'
-import { checkAllSites } from './sites.js'
+import { checkAllSites, getStaticSites } from './sites.js'
 import { deployProcess } from './deploy.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -37,7 +37,7 @@ app.get('/api/processes', async (_req, res) => {
   try {
     const processes = await getPM2Processes()
     res.json(processes)
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch processes' })
   }
 })
@@ -46,7 +46,7 @@ app.get('/api/system', async (_req, res) => {
   try {
     const system = await getSystemInfo()
     res.json(system)
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch system info' })
   }
 })
@@ -55,7 +55,7 @@ app.get('/api/system/history', async (_req, res) => {
   try {
     const history = getSystemHistory()
     res.json(history)
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch system history' })
   }
 })
@@ -65,7 +65,7 @@ app.get('/api/processes/:id/logs', async (req, res) => {
     const lines = parseInt(req.query.lines as string) || 50
     const logs = await getPM2Logs(parseInt(req.params.id), lines)
     res.json(logs)
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch logs' })
   }
 })
@@ -74,7 +74,7 @@ app.post('/api/processes/:id/restart', async (req, res) => {
   try {
     await restartProcess(parseInt(req.params.id))
     res.json({ success: true })
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to restart process' })
   }
 })
@@ -83,7 +83,7 @@ app.post('/api/processes/:id/stop', async (req, res) => {
   try {
     await stopProcess(parseInt(req.params.id))
     res.json({ success: true })
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to stop process' })
   }
 })
@@ -92,7 +92,7 @@ app.post('/api/processes/:name/deploy', async (req, res) => {
   try {
     const result = await deployProcess(req.params.name)
     res.json(result)
-  } catch (error) {
+  } catch {
     res.status(500).json({ success: false, error: 'Deploy failed unexpectedly' })
   }
 })
@@ -101,8 +101,17 @@ app.get('/api/sites', async (_req, res) => {
   try {
     const sites = await checkAllSites()
     res.json(sites)
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Failed to check sites' })
+  }
+})
+
+app.get('/api/static-sites', async (_req, res) => {
+  try {
+    const sites = await getStaticSites()
+    res.json(sites)
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch static sites' })
   }
 })
 

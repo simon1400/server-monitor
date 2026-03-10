@@ -120,6 +120,53 @@ function checkSSL(domain: string): Promise<SiteStatus['ssl']> {
   })
 }
 
+export interface StaticSite {
+  domain: string
+  root: string
+  ssl: boolean
+  diskUsage: string
+}
+
+// Parse nginx config to find static sites (root + try_files, no proxy_pass)
+export async function getStaticSites(): Promise<StaticSite[]> {
+  try {
+    const { stdout } = await execAsync('nginx -T 2>/dev/null')
+    const sites: StaticSite[] = []
+    // Split into server blocks
+    const blocks = stdout.split(/(?=server\s*\{)/)
+
+    for (const block of blocks) {
+      if (!block.includes('server {') && !block.includes('server{')) continue
+      // Skip blocks that are just redirects or have proxy_pass
+      if (block.includes('proxy_pass')) continue
+      if (!block.includes('try_files')) continue
+
+      const domainMatch = block.match(/server_name\s+([a-z0-9._-]+)/i)
+      const rootMatch = block.match(/root\s+([^;]+);/)
+      if (!domainMatch || !rootMatch) continue
+
+      const domain = domainMatch[1]
+      if (domain === 'localhost' || domain === '_') continue
+
+      const root = rootMatch[1].trim()
+      const hasSsl = block.includes('ssl_certificate') || block.includes('listen 443')
+
+      // Get disk usage of the root directory
+      let diskUsage = 'N/A'
+      try {
+        const { stdout: du } = await execAsync(`du -sh ${root} 2>/dev/null`)
+        diskUsage = du.split('\t')[0] || 'N/A'
+      } catch { /* disk usage unavailable */ }
+
+      sites.push({ domain, root, ssl: hasSsl, diskUsage })
+    }
+
+    return sites
+  } catch {
+    return []
+  }
+}
+
 let cachedSites: SiteStatus[] = []
 let lastCheck = 0
 

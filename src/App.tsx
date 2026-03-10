@@ -4,6 +4,7 @@ import SystemOverview from './components/SystemOverview'
 import SystemChart from './components/SystemChart'
 import ProcessList from './components/ProcessList'
 import SitesStatus from './components/SitesStatus'
+import StaticSites from './components/StaticSites'
 import { Loader2 } from 'lucide-react'
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         <SystemOverview system={data.system} />
         <SitesStatus />
+        <StaticSites />
         <SystemChart />
         <div className="mb-4">
           <h2 className="text-xl font-bold text-text-primary mb-1">PM2 Processes</h2>
