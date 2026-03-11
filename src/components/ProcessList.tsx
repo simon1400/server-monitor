@@ -9,18 +9,50 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
   const [sortDir, setSortDir] = useState<SortDirection>('asc')
   const [filter, setFilter] = useState<'all' | 'online' | 'errored' | 'stopped'>('all')
 
-  // Build a map: domain -> SiteStatus
-  const siteMap = useMemo(() => {
-    const map = new Map<string, SiteStatus>()
+  // Build a map: pm_id -> SiteStatus (with name-based fallback)
+  const processSiteMap = useMemo(() => {
+    const domainMap = new Map<string, SiteStatus>()
     for (const site of sites) {
-      map.set(site.domain, site)
+      domainMap.set(site.domain, site)
     }
-    return map
-  }, [sites])
+
+    const result = new Map<number, SiteStatus>()
+    const usedDomains = new Set<string>()
+
+    // 1st pass: exact match via httpDomain (PID-based mapping from backend)
+    for (const proc of processes) {
+      if (proc.httpDomain) {
+        const site = domainMap.get(proc.httpDomain)
+        if (site) {
+          result.set(proc.pm_id, site)
+          usedDomains.add(site.domain)
+        }
+      }
+    }
+
+    // 2nd pass: fallback — match by process name prefix
+    // e.g. "tulsio-client" → prefix "tulsio" → matches "tulsio.hardart.cz"
+    for (const proc of processes) {
+      if (result.has(proc.pm_id)) continue
+      const prefix = proc.name.replace(/-(client|strapi)$/, '')
+      if (!prefix || prefix === proc.name) continue
+      for (const site of sites) {
+        if (usedDomains.has(site.domain)) continue
+        // match domain starting with prefix or containing prefix before a dot
+        if (site.domain.startsWith(prefix + '.') || site.domain.includes(prefix + '.')) {
+          result.set(proc.pm_id, site)
+          usedDomains.add(site.domain)
+          break
+        }
+      }
+    }
+
+    return result
+  }, [sites, processes])
 
   const stats = useMemo(() => {
     const problematic = processes.filter((p) => {
-      const site = p.httpDomain ? siteMap.get(p.httpDomain) : undefined
+      const site = processSiteMap.get(p.pm_id)
       const sslBad = site?.ssl && !site.ssl.valid
       return p.restarts > 5 || p.status === 'errored' || (p.status === 'online' && p.httpOk === false) || sslBad
     })
@@ -31,13 +63,17 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
       stopped: processes.filter((p) => p.status === 'stopped').length,
       problematic: problematic.length,
     }
-  }, [processes, siteMap])
+  }, [processes, processSiteMap])
 
   // Domains not linked to any process
   const orphanSites = useMemo(() => {
-    const linkedDomains = new Set(processes.map(p => p.httpDomain).filter(Boolean))
+    const linkedDomains = new Set<string>()
+    for (const proc of processes) {
+      const site = processSiteMap.get(proc.pm_id)
+      if (site) linkedDomains.add(site.domain)
+    }
     return sites.filter(s => !linkedDomains.has(s.domain))
-  }, [processes, sites])
+  }, [processes, sites, processSiteMap])
 
   const filtered = useMemo(() => {
     let result = [...processes]
@@ -45,14 +81,14 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
     if (search) {
       const q = search.toLowerCase()
       result = result.filter((p) => {
-        const domain = p.httpDomain ? siteMap.get(p.httpDomain)?.domain : undefined
+        const domain = processSiteMap.get(p.pm_id)?.domain
         return p.name.toLowerCase().includes(q) || (domain && domain.toLowerCase().includes(q))
       })
     }
 
     if (filter === 'online') result = result.filter((p) => p.status === 'online')
     else if (filter === 'errored') result = result.filter((p) => {
-      const site = p.httpDomain ? siteMap.get(p.httpDomain) : undefined
+      const site = processSiteMap.get(p.pm_id)
       const sslBad = site?.ssl && !site.ssl.valid
       return p.status === 'errored' || p.restarts > 5 || (p.status === 'online' && p.httpOk === false) || sslBad
     })
@@ -72,7 +108,7 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
     })
 
     return result
-  }, [processes, search, sortField, sortDir, filter, siteMap])
+  }, [processes, search, sortField, sortDir, filter, processSiteMap])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -147,7 +183,7 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
       {/* Process cards */}
       <div className="space-y-2">
         {filtered.map((proc) => (
-          <ProcessCard key={proc.pm_id} process={proc} site={proc.httpDomain ? siteMap.get(proc.httpDomain) : undefined} onAction={onAction} />
+          <ProcessCard key={proc.pm_id} process={proc} site={processSiteMap.get(proc.pm_id)} onAction={onAction} />
         ))}
         {filtered.length === 0 && (
           <div className="text-center py-8 text-text-muted">
