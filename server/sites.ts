@@ -270,12 +270,12 @@ export async function getProcessHttpStatus(pids: { pm_id: number; pid: number }[
       }
     }
 
-    // 2. Get PID → port mapping using ss
-    const activePids = pids.filter(p => p.pid > 0).map(p => p.pid)
+    // 2. Get listening port → PID mapping using ss, then resolve to PM2 process via process tree
+    const activePids = pids.filter(p => p.pid > 0)
     if (activePids.length === 0) return result
 
     const { stdout: ssOutput } = await execAsync('ss -tlnp 2>/dev/null')
-    const pidPortMap = new Map<number, number>() // pid → port
+    const portListenerPid = new Map<number, number>() // port → listener pid
 
     for (const line of ssOutput.split('\n')) {
       const portMatch = line.match(/:(\d+)\s/)
@@ -283,20 +283,49 @@ export async function getProcessHttpStatus(pids: { pm_id: number; pid: number }[
       if (portMatch && pidMatch) {
         const port = parseInt(portMatch[1])
         const pid = parseInt(pidMatch[1])
-        if (activePids.includes(pid)) {
-          pidPortMap.set(pid, port)
+        if (domainPortMap.has(port)) {
+          portListenerPid.set(port, pid)
         }
       }
     }
 
-    // 3. Match: PM2 process → PID → port → domain
+    // Build child→ancestor map using ps to walk process trees
+    // Get all process parent relationships at once
+    const { stdout: psOutput } = await execAsync('ps -eo pid,ppid --no-headers 2>/dev/null')
+    const parentMap = new Map<number, number>() // child pid → parent pid
+    for (const line of psOutput.trim().split('\n')) {
+      const parts = line.trim().split(/\s+/)
+      if (parts.length >= 2) {
+        parentMap.set(parseInt(parts[0]), parseInt(parts[1]))
+      }
+    }
+
+    // For each listener PID, walk up to find PM2 process ancestor
+    function findPm2Ancestor(listenerPid: number): number | null {
+      let current = listenerPid
+      const visited = new Set<number>()
+      while (current > 1 && !visited.has(current)) {
+        visited.add(current)
+        for (const { pid } of activePids) {
+          if (current === pid) return pid
+        }
+        const parent = parentMap.get(current)
+        if (!parent) break
+        current = parent
+      }
+      return null
+    }
+
+    // 3. Match: port → listener PID → ancestor PM2 PID → pm_id → domain
     const checksToRun: { pm_id: number; domain: string }[] = []
-    for (const { pm_id, pid } of pids) {
-      const port = pidPortMap.get(pid)
-      if (port) {
-        const domain = domainPortMap.get(port)
-        if (domain) {
-          checksToRun.push({ pm_id, domain })
+    for (const [port, listenerPid] of portListenerPid) {
+      const domain = domainPortMap.get(port)
+      if (!domain) continue
+      const ancestorPid = findPm2Ancestor(listenerPid)
+      if (ancestorPid) {
+        const proc = activePids.find(p => p.pid === ancestorPid)
+        if (proc) {
+          checksToRun.push({ pm_id: proc.pm_id, domain })
         }
       }
     }
