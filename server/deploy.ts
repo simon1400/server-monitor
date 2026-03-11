@@ -42,8 +42,12 @@ export async function deployProcess(processName: string): Promise<DeployResult> 
     return { success: false, steps, error: 'npm install failed' }
   }
 
-  // 4. Build
-  const build = await execCmd('npm run build 2>&1', cwd)
+  // 4. Build (Strapi needs extra heap for webpack)
+  const isStrapi = processName.includes('strapi')
+  const buildCmd = isStrapi
+    ? 'NODE_OPTIONS="--max-old-space-size=4096" npm run build 2>&1'
+    : 'npm run build 2>&1'
+  const build = await execCmd(buildCmd, cwd)
   steps.push({ name: 'npm run build', ...build })
   if (!build.success) {
     return { success: false, steps, error: 'Build failed' }
