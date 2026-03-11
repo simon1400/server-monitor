@@ -98,6 +98,29 @@ export async function stopProcess(id: number): Promise<boolean> {
   }
 }
 
+export async function getProcessEnv(name: string): Promise<{ entries: { key: string; value: string }[]; cwd: string } | null> {
+  try {
+    const res = await fetch(`${API_BASE}/processes/${encodeURIComponent(name)}/env`)
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+export async function saveProcessEnv(name: string, entries: { key: string; value: string }[]): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/processes/${encodeURIComponent(name)}/env`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries }),
+    })
+    return await res.json()
+  } catch {
+    return { success: false, error: 'Network error' }
+  }
+}
+
 export async function deployProcess(name: string): Promise<any> {
   try {
     const res = await fetch(`${API_BASE}/processes/${encodeURIComponent(name)}/deploy`, { method: 'POST' })

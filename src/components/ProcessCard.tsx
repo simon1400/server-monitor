@@ -1,8 +1,9 @@
-import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2, Globe, ShieldCheck, ShieldAlert, ShieldX, ExternalLink } from 'lucide-react'
+import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2, Globe, ShieldCheck, ShieldAlert, ShieldX, ExternalLink, FileCode } from 'lucide-react'
 import { useState } from 'react'
 import type { PM2Process, SiteStatus } from '../types'
 import { restartProcess, stopProcess, deployProcess } from '../hooks/useMonitor'
 import ProcessLogs from './ProcessLogs'
+import EnvModal from './EnvModal'
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -49,6 +50,7 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
   const [actionLoading, setActionLoading] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployResult, setDeployResult] = useState<DeployResult | null>(null)
+  const [envModalOpen, setEnvModalOpen] = useState(false)
   const isHttpBad = process.status === 'online' && process.httpOk === false
   const isSslBad = site?.ssl !== undefined && site?.ssl !== null && !site.ssl.valid
   const isSslWarning = site?.ssl?.valid && site.ssl.daysLeft <= 14
@@ -175,6 +177,13 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
 
             {/* Actions */}
             <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); setEnvModalOpen(true) }}
+                className="p-1.5 rounded-lg hover:bg-accent-yellow/10 text-text-muted hover:text-accent-yellow transition-colors"
+                title="Environment variables"
+              >
+                <FileCode className="w-4 h-4" />
+              </button>
               <button
                 onClick={handleDeploy}
                 disabled={actionLoading || deploying}
@@ -372,6 +381,14 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
           )}
           <ProcessLogs processId={process.pm_id} />
         </div>
+      )}
+
+      {envModalOpen && (
+        <EnvModal
+          processName={process.name}
+          onClose={() => setEnvModalOpen(false)}
+          onSaved={() => { setEnvModalOpen(false); onAction() }}
+        />
       )}
     </div>
   )

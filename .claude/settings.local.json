@@ -48,7 +48,8 @@
       "Bash(npm run:*)",
       "Bash(gh run:*)",
       "Bash(ssh root@157.90.169.205 'sleep 3 && PASS=$\\(grep AUTH_PASSWORD /opt/server-monitor/.env | cut -d= -f2\\) && TOKEN=$\\(curl -s -X POST http://127.0.0.1:4400/api/login -H \"\"Content-Type: application/json\"\" -d \"\"{\\\\\"\"password\\\\\"\": \\\\\"\"$PASS\\\\\"\"}\"\" -c - 2>/dev/null | grep sm_session | awk \"\"{print \\\\$NF}\"\"\\) && curl -s http://127.0.0.1:4400/api/monitor -b \"\"sm_session=$TOKEN\"\" 2>/dev/null | python3 -c \"\"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f\\\\\"\"{p[\\\\\\\\\\\\\"\"name\\\\\\\\\\\\\"\"]:25} status={p[\\\\\\\\\\\\\"\"status\\\\\\\\\\\\\"\"]:10} httpOk={p.get\\(\\\\\\\\\\\\\"\"httpOk\\\\\\\\\\\\\"\",\\\\\\\\\\\\\"\"N/A\\\\\\\\\\\\\"\"\\)} domain={p.get\\(\\\\\\\\\\\\\"\"httpDomain\\\\\\\\\\\\\"\",\\\\\\\\\\\\\"\"none\\\\\\\\\\\\\"\"\\)}\\\\\"\"\\) for p in d[\\\\\\\\\\\\\"\"processes\\\\\\\\\\\\\"\"]]\"\"')",
-      "Bash(ssh root@157.90.169.205 'sleep 2 && PASS=$\\(grep AUTH_PASSWORD /opt/server-monitor/.env | cut -d= -f2\\) && RESP=$\\(curl -s -c /tmp/sm_cookie -X POST http://127.0.0.1:4400/api/login -H \"\"Content-Type: application/json\"\" -d \"\"{\\\\\"\"password\\\\\"\": \\\\\"\"'\"$PASS\"'\\\\\"\"}\"\"\\) && echo \"\"Login: $RESP\"\" && curl -s -b /tmp/sm_cookie http://127.0.0.1:4400/api/monitor | python3 -c \"\":*)"
+      "Bash(ssh root@157.90.169.205 'sleep 2 && PASS=$\\(grep AUTH_PASSWORD /opt/server-monitor/.env | cut -d= -f2\\) && RESP=$\\(curl -s -c /tmp/sm_cookie -X POST http://127.0.0.1:4400/api/login -H \"\"Content-Type: application/json\"\" -d \"\"{\\\\\"\"password\\\\\"\": \\\\\"\"'\"$PASS\"'\\\\\"\"}\"\"\\) && echo \"\"Login: $RESP\"\" && curl -s -b /tmp/sm_cookie http://127.0.0.1:4400/api/monitor | python3 -c \"\":*)",
+      "Bash(find /d/server-monitor -name ecosystem* -o -name .env*)"
     ]
   }
 }

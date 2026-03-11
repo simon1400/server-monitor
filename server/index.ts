@@ -7,6 +7,7 @@ import { getPM2Processes, getPM2Logs, restartProcess, stopProcess } from './pm2.
 import { getSystemInfo, getSystemHistory, startSystemHistoryCollection } from './system.js'
 import { checkAllSites, getStaticSites, getDiskUsage, getProcessHttpStatus } from './sites.js'
 import { deployProcess } from './deploy.js'
+import { getProcessEnv, saveProcessEnv } from './env.js'
 import { authMiddleware, login, logout, checkAuth } from './auth.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -137,6 +138,33 @@ app.post('/api/processes/:name/deploy', async (req, res) => {
     res.json(result)
   } catch {
     res.status(500).json({ success: false, error: 'Deploy failed unexpectedly' })
+  }
+})
+
+app.get('/api/processes/:name/env', async (req, res) => {
+  try {
+    const result = await getProcessEnv(req.params.name)
+    if (!result) {
+      res.status(404).json({ error: 'Process not found' })
+      return
+    }
+    res.json(result)
+  } catch {
+    res.status(500).json({ error: 'Failed to read env' })
+  }
+})
+
+app.put('/api/processes/:name/env', async (req, res) => {
+  try {
+    const { entries } = req.body
+    if (!Array.isArray(entries)) {
+      res.status(400).json({ error: 'Invalid entries' })
+      return
+    }
+    const result = await saveProcessEnv(req.params.name, entries)
+    res.json(result)
+  } catch {
+    res.status(500).json({ error: 'Failed to save env' })
   }
 })
 
