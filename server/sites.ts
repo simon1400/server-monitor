@@ -256,17 +256,38 @@ export async function getProcessHttpStatus(pids: { pm_id: number; pid: number }[
     // 1. Parse nginx config: domain → upstream port
     const { stdout: nginxConfig } = await execAsync('nginx -T 2>/dev/null')
     const domainPortMap = new Map<number, string>() // port → domain
+
+    // First, parse upstream blocks to get upstream_name → port
+    const upstreamPortMap = new Map<string, number>()
+    const upstreamRegex = /upstream\s+(\S+)\s*\{[^}]*server\s+[\w.:]+:(\d+)/g
+    let upMatch
+    while ((upMatch = upstreamRegex.exec(nginxConfig)) !== null) {
+      upstreamPortMap.set(upMatch[1], parseInt(upMatch[2]))
+    }
+
     const blocks = nginxConfig.split(/(?=server\s*\{)/)
 
     for (const block of blocks) {
       if (!block.includes('server {') && !block.includes('server{')) continue
       const domainMatch = block.match(/server_name\s+([a-z0-9._-]+)/i)
-      const proxyMatch = block.match(/proxy_pass\s+https?:\/\/[^:]+:(\d+)/)
-      if (!domainMatch || !proxyMatch) continue
+      if (!domainMatch) continue
       const domain = domainMatch[1]
-      const port = parseInt(proxyMatch[1])
-      if (domain !== 'localhost' && domain !== '_') {
-        domainPortMap.set(port, domain)
+      if (domain === 'localhost' || domain === '_' || domain.startsWith('www.')) continue
+
+      // Try direct port match: proxy_pass http://host:PORT
+      const directMatch = block.match(/proxy_pass\s+https?:\/\/[\w.-]+:(\d+)/)
+      if (directMatch) {
+        domainPortMap.set(parseInt(directMatch[1]), domain)
+        continue
+      }
+
+      // Try upstream match: proxy_pass http://upstream_name
+      const upstreamMatch = block.match(/proxy_pass\s+https?:\/\/(\w+)/)
+      if (upstreamMatch) {
+        const port = upstreamPortMap.get(upstreamMatch[1])
+        if (port) {
+          domainPortMap.set(port, domain)
+        }
       }
     }
 
