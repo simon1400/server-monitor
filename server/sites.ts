@@ -247,6 +247,89 @@ export async function getDiskUsage(): Promise<DiskUsageResponse> {
   }
 }
 
+// Map PM2 PIDs to their nginx domains and HTTP status
+export async function getProcessHttpStatus(pids: { pm_id: number; pid: number }[]): Promise<Map<number, { domain: string; httpStatus: number | null; httpOk: boolean }>> {
+  const result = new Map<number, { domain: string; httpStatus: number | null; httpOk: boolean }>()
+  if (pids.length === 0) return result
+
+  try {
+    // 1. Parse nginx config: domain → upstream port
+    const { stdout: nginxConfig } = await execAsync('nginx -T 2>/dev/null')
+    const domainPortMap = new Map<number, string>() // port → domain
+    const blocks = nginxConfig.split(/(?=server\s*\{)/)
+
+    for (const block of blocks) {
+      if (!block.includes('server {') && !block.includes('server{')) continue
+      const domainMatch = block.match(/server_name\s+([a-z0-9._-]+)/i)
+      const proxyMatch = block.match(/proxy_pass\s+https?:\/\/[^:]+:(\d+)/)
+      if (!domainMatch || !proxyMatch) continue
+      const domain = domainMatch[1]
+      const port = parseInt(proxyMatch[1])
+      if (domain !== 'localhost' && domain !== '_') {
+        domainPortMap.set(port, domain)
+      }
+    }
+
+    // 2. Get PID → port mapping using ss
+    const activePids = pids.filter(p => p.pid > 0).map(p => p.pid)
+    if (activePids.length === 0) return result
+
+    const { stdout: ssOutput } = await execAsync('ss -tlnp 2>/dev/null')
+    const pidPortMap = new Map<number, number>() // pid → port
+
+    for (const line of ssOutput.split('\n')) {
+      const portMatch = line.match(/:(\d+)\s/)
+      const pidMatch = line.match(/pid=(\d+)/)
+      if (portMatch && pidMatch) {
+        const port = parseInt(portMatch[1])
+        const pid = parseInt(pidMatch[1])
+        if (activePids.includes(pid)) {
+          pidPortMap.set(pid, port)
+        }
+      }
+    }
+
+    // 3. Match: PM2 process → PID → port → domain
+    const checksToRun: { pm_id: number; domain: string }[] = []
+    for (const { pm_id, pid } of pids) {
+      const port = pidPortMap.get(pid)
+      if (port) {
+        const domain = domainPortMap.get(port)
+        if (domain) {
+          checksToRun.push({ pm_id, domain })
+        }
+      }
+    }
+
+    // 4. Run HTTP checks for matched domains (use cached sites if available)
+    const cachedMap = new Map(cachedSites.map(s => [s.domain, s]))
+    const uncachedChecks = checksToRun.filter(c => !cachedMap.has(c.domain))
+
+    // For uncached, do quick HTTP checks
+    const freshChecks = await Promise.all(
+      uncachedChecks.map(async (c) => {
+        const httpResult = await checkHttp(c.domain)
+        return { domain: c.domain, status: httpResult.status, ok: httpResult.status !== null && httpResult.status >= 200 && httpResult.status < 400 }
+      })
+    )
+    const freshMap = new Map(freshChecks.map(c => [c.domain, c]))
+
+    for (const { pm_id, domain } of checksToRun) {
+      const cached = cachedMap.get(domain)
+      const fresh = freshMap.get(domain)
+      if (cached) {
+        result.set(pm_id, { domain, httpStatus: cached.httpStatus, httpOk: cached.httpOk })
+      } else if (fresh) {
+        result.set(pm_id, { domain, httpStatus: fresh.status, httpOk: fresh.ok })
+      }
+    }
+  } catch {
+    // If mapping fails, return empty — PM2 status is still shown
+  }
+
+  return result
+}
+
 let cachedSites: SiteStatus[] = []
 let lastCheck = 0
 

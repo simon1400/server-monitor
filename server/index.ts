@@ -5,7 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { getPM2Processes, getPM2Logs, restartProcess, stopProcess } from './pm2.js'
 import { getSystemInfo, getSystemHistory, startSystemHistoryCollection } from './system.js'
-import { checkAllSites, getStaticSites, getDiskUsage } from './sites.js'
+import { checkAllSites, getStaticSites, getDiskUsage, getProcessHttpStatus } from './sites.js'
 import { deployProcess } from './deploy.js'
 import { authMiddleware, login, logout, checkAuth } from './auth.js'
 
@@ -51,6 +51,23 @@ app.get('/api/monitor', async (_req, res) => {
       getPM2Processes(),
       getSystemInfo(),
     ])
+
+    // Enrich processes with HTTP health check data
+    try {
+      const pids = processes
+        .filter(p => p.status === 'online' && p.pid > 0)
+        .map(p => ({ pm_id: p.pm_id, pid: p.pid }))
+      const httpStatus = await getProcessHttpStatus(pids)
+      for (const proc of processes) {
+        const status = httpStatus.get(proc.pm_id)
+        if (status) {
+          proc.httpDomain = status.domain
+          proc.httpStatus = status.httpStatus
+          proc.httpOk = status.httpOk
+        }
+      }
+    } catch { /* HTTP check enrichment is non-critical */ }
+
     res.json({ processes, system, timestamp: Date.now() })
   } catch (error) {
     console.error('Monitor error:', error)

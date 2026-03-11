@@ -1,4 +1,4 @@
-import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2, Globe } from 'lucide-react'
 import { useState } from 'react'
 import type { PM2Process } from '../types'
 import { restartProcess, stopProcess, deployProcess } from '../hooks/useMonitor'
@@ -49,7 +49,8 @@ export default function ProcessCard({ process, onAction }: { process: PM2Process
   const [actionLoading, setActionLoading] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployResult, setDeployResult] = useState<DeployResult | null>(null)
-  const isProblematic = process.restarts > 5 || process.status === 'errored'
+  const isHttpBad = process.status === 'online' && process.httpOk === false
+  const isProblematic = process.restarts > 5 || process.status === 'errored' || isHttpBad
 
   const handleRestart = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -97,6 +98,17 @@ export default function ProcessCard({ process, onAction }: { process: PM2Process
               <span className={`text-xs px-2 py-0.5 rounded-full ${statusBg[process.status]}`}>
                 {process.status}
               </span>
+              {isHttpBad && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-accent-red/10 text-accent-red flex items-center gap-1" title={`${process.httpDomain} returned HTTP ${process.httpStatus ?? 'error'}`}>
+                  <Globe className="w-3 h-3" />
+                  HTTP {process.httpStatus ?? 'err'}
+                </span>
+              )}
+              {process.status === 'online' && process.httpOk === true && process.httpDomain && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-accent-green/10 text-accent-green flex items-center gap-1" title={`${process.httpDomain} is healthy`}>
+                  <Globe className="w-3 h-3" />
+                </span>
+              )}
             </div>
           </div>
 

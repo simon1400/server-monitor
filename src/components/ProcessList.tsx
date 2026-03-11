@@ -14,7 +14,7 @@ export default function ProcessList({ processes, onAction }: { processes: PM2Pro
     online: processes.filter((p) => p.status === 'online').length,
     errored: processes.filter((p) => p.status === 'errored').length,
     stopped: processes.filter((p) => p.status === 'stopped').length,
-    problematic: processes.filter((p) => p.restarts > 5 || p.status === 'errored').length,
+    problematic: processes.filter((p) => p.restarts > 5 || p.status === 'errored' || (p.status === 'online' && p.httpOk === false)).length,
   }), [processes])
 
   const filtered = useMemo(() => {
@@ -26,7 +26,7 @@ export default function ProcessList({ processes, onAction }: { processes: PM2Pro
     }
 
     if (filter === 'online') result = result.filter((p) => p.status === 'online')
-    else if (filter === 'errored') result = result.filter((p) => p.status === 'errored' || p.restarts > 5)
+    else if (filter === 'errored') result = result.filter((p) => p.status === 'errored' || p.restarts > 5 || (p.status === 'online' && p.httpOk === false))
     else if (filter === 'stopped') result = result.filter((p) => p.status === 'stopped')
 
     result.sort((a, b) => {

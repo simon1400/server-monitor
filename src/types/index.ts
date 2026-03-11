@@ -14,6 +14,9 @@ export interface PM2Process {
   unstable_restarts: number
   created_at: number
   axm_monitor: Record<string, { value: string | number; unit?: string }>
+  httpDomain?: string
+  httpStatus?: number | null
+  httpOk?: boolean
 }
 
 export interface SystemInfo {
