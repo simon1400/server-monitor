@@ -12,9 +12,8 @@ interface HeaderProps {
 
 const navItems = [
   { to: '/', label: 'Overview' },
-  { to: '/sites', label: 'Sites' },
+  { to: '/apps', label: 'Apps' },
   { to: '/disk', label: 'Disk' },
-  { to: '/processes', label: 'Processes' },
 ]
 
 export default function Header({ lastUpdate, loading, error, onRefresh, processCount }: HeaderProps) {

@@ -3,7 +3,6 @@ import { Routes, Route } from 'react-router'
 import { useMonitor } from './hooks/useMonitor'
 import Header from './components/Header'
 import OverviewPage from './pages/OverviewPage'
-import SitesPage from './pages/SitesPage'
 import DiskPage from './pages/DiskPage'
 import ProcessesPage from './pages/ProcessesPage'
 import LoginPage from './components/LoginPage'
@@ -57,9 +56,8 @@ function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         <Routes>
           <Route path="/" element={<OverviewPage data={data} />} />
-          <Route path="/sites" element={<SitesPage />} />
+          <Route path="/apps" element={<ProcessesPage data={data} onAction={refresh} />} />
           <Route path="/disk" element={<DiskPage />} />
-          <Route path="/processes" element={<ProcessesPage data={data} onAction={refresh} />} />
         </Routes>
       </main>
     </div>

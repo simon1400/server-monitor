@@ -1,6 +1,6 @@
-import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2, Globe } from 'lucide-react'
+import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2, Globe, ShieldCheck, ShieldAlert, ShieldX, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
-import type { PM2Process } from '../types'
+import type { PM2Process, SiteStatus } from '../types'
 import { restartProcess, stopProcess, deployProcess } from '../hooks/useMonitor'
 import ProcessLogs from './ProcessLogs'
 
@@ -44,13 +44,15 @@ interface DeployResult {
   error?: string
 }
 
-export default function ProcessCard({ process, onAction }: { process: PM2Process; onAction: () => void }) {
+export default function ProcessCard({ process, site, onAction }: { process: PM2Process; site?: SiteStatus; onAction: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployResult, setDeployResult] = useState<DeployResult | null>(null)
   const isHttpBad = process.status === 'online' && process.httpOk === false
-  const isProblematic = process.restarts > 5 || process.status === 'errored' || isHttpBad
+  const isSslBad = site?.ssl !== undefined && site?.ssl !== null && !site.ssl.valid
+  const isSslWarning = site?.ssl?.valid && site.ssl.daysLeft <= 14
+  const isProblematic = process.restarts > 5 || process.status === 'errored' || isHttpBad || isSslBad
 
   const handleRestart = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -95,20 +97,54 @@ export default function ProcessCard({ process, onAction }: { process: PM2Process
                   <AlertTriangle className="w-4 h-4 text-accent-red" />
                 )}
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${statusBg[process.status]}`}>
-                {process.status}
-              </span>
-              {isHttpBad && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-accent-red/10 text-accent-red flex items-center gap-1" title={`${process.httpDomain} returned HTTP ${process.httpStatus ?? 'error'}`}>
-                  <Globe className="w-3 h-3" />
-                  HTTP {process.httpStatus ?? 'err'}
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${statusBg[process.status]}`}>
+                  {process.status}
                 </span>
-              )}
-              {process.status === 'online' && process.httpOk === true && process.httpDomain && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-accent-green/10 text-accent-green flex items-center gap-1" title={`${process.httpDomain} is healthy`}>
-                  <Globe className="w-3 h-3" />
-                </span>
-              )}
+                {/* Domain badge */}
+                {site && (
+                  <a
+                    href={`https://${site.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 hover:underline ${
+                      !site.httpOk ? 'bg-accent-red/10 text-accent-red' : 'bg-accent-cyan/10 text-accent-cyan'
+                    }`}
+                  >
+                    <Globe className="w-3 h-3" />
+                    {site.domain}
+                  </a>
+                )}
+                {!site && process.httpDomain && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                    isHttpBad ? 'bg-accent-red/10 text-accent-red' : 'bg-accent-cyan/10 text-accent-cyan'
+                  }`}>
+                    <Globe className="w-3 h-3" />
+                    {process.httpDomain}
+                  </span>
+                )}
+                {/* HTTP status */}
+                {site && (
+                  site.httpOk
+                    ? <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-accent-green/15 text-accent-green">{site.httpStatus}</span>
+                    : <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-accent-red/15 text-accent-red">{site.httpStatus ?? 'DOWN'}</span>
+                )}
+                {!site && isHttpBad && (
+                  <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-accent-red/15 text-accent-red">HTTP {process.httpStatus ?? 'err'}</span>
+                )}
+                {/* SSL badge */}
+                {site?.ssl && (
+                  !site.ssl.valid
+                    ? <span className="flex items-center gap-1 text-xs text-accent-red font-medium"><ShieldAlert className="w-3 h-3" /> SSL {site.ssl.daysLeft <= 0 ? 'Expired' : 'Invalid'}</span>
+                    : site.ssl.daysLeft <= 14
+                      ? <span className="flex items-center gap-1 text-xs text-accent-yellow font-medium"><ShieldAlert className="w-3 h-3" /> {site.ssl.daysLeft}d</span>
+                      : <span className="flex items-center gap-1 text-xs text-accent-green"><ShieldCheck className="w-3 h-3" /> {site.ssl.daysLeft}d</span>
+                )}
+                {site && !site.ssl && (
+                  <span className="flex items-center gap-1 text-xs text-text-muted"><ShieldX className="w-3 h-3" /> No SSL</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -230,6 +266,69 @@ export default function ProcessCard({ process, onAction }: { process: PM2Process
               </>
             )}
           </div>
+
+          {/* Domain details */}
+          {site && (
+            <div className="border-t border-border p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Globe className="w-4 h-4 text-accent-cyan" />
+                <span className="text-sm font-semibold text-text-primary">Domain</span>
+                <a
+                  href={`https://${site.domain}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-accent-cyan hover:underline flex items-center gap-1"
+                >
+                  {site.domain} <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <span className="text-text-muted block">HTTP Status</span>
+                  <span className={`font-mono font-bold ${site.httpOk ? 'text-accent-green' : 'text-accent-red'}`}>
+                    {site.httpStatus ?? 'DOWN'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-text-muted block">Response Time</span>
+                  <span className="font-mono text-text-primary">{site.responseTime}ms</span>
+                </div>
+                {site.ssl && (
+                  <>
+                    <div>
+                      <span className="text-text-muted block">SSL Issuer</span>
+                      <span className="font-mono text-text-primary">{site.ssl.issuer || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-text-muted block">SSL Expires</span>
+                      <span className={`font-mono ${site.ssl.daysLeft <= 0 ? 'text-accent-red font-bold' : site.ssl.daysLeft <= 14 ? 'text-accent-yellow' : 'text-text-primary'}`}>
+                        {site.ssl.notAfter ? new Date(site.ssl.notAfter).toLocaleDateString('cs-CZ') : 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-text-muted block">Days Left</span>
+                      <span className={`font-mono font-bold ${site.ssl.daysLeft <= 0 ? 'text-accent-red' : site.ssl.daysLeft <= 14 ? 'text-accent-yellow' : 'text-accent-green'}`}>
+                        {site.ssl.daysLeft}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-text-muted block">SSL Valid</span>
+                      <span className={`font-mono ${site.ssl.valid ? 'text-accent-green' : 'text-accent-red'}`}>
+                        {site.ssl.valid ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+              {(site.error || site.ssl?.error) && (
+                <div className="mt-3 p-2 bg-accent-red/10 rounded text-xs text-accent-red">
+                  {site.error && <div>HTTP: {site.error}</div>}
+                  {site.ssl?.error && <div>SSL: {site.ssl.error}</div>}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Deploy status */}
           {(deploying || deployResult) && (
             <div className="border-t border-border p-4">

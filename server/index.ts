@@ -47,9 +47,10 @@ app.use(authMiddleware)
 // API routes
 app.get('/api/monitor', async (_req, res) => {
   try {
-    const [processes, system] = await Promise.all([
+    const [processes, system, sites] = await Promise.all([
       getPM2Processes(),
       getSystemInfo(),
+      checkAllSites().catch(() => []),
     ])
 
     // Enrich processes with HTTP health check data
@@ -68,7 +69,7 @@ app.get('/api/monitor', async (_req, res) => {
       }
     } catch { /* HTTP check enrichment is non-critical */ }
 
-    res.json({ processes, system, timestamp: Date.now() })
+    res.json({ processes, system, sites, timestamp: Date.now() })
   } catch (error) {
     console.error('Monitor error:', error)
     res.status(500).json({ error: 'Failed to fetch monitor data' })

@@ -66,9 +66,28 @@ export interface HistoryPoint {
   memory: number
 }
 
+export interface SiteSSL {
+  valid: boolean
+  issuer: string
+  notBefore: string
+  notAfter: string
+  daysLeft: number
+  error: string | null
+}
+
+export interface SiteStatus {
+  domain: string
+  httpStatus: number | null
+  httpOk: boolean
+  responseTime: number
+  ssl: SiteSSL | null
+  error: string | null
+}
+
 export interface MonitorData {
   processes: PM2Process[]
   system: SystemInfo
+  sites: SiteStatus[]
   timestamp: number
 }
 

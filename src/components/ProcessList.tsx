@@ -1,32 +1,61 @@
 import { useState, useMemo } from 'react'
-import { Search, SortAsc, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
-import type { PM2Process, SortField, SortDirection } from '../types'
+import { Search, SortAsc, AlertTriangle, CheckCircle, XCircle, Globe, ShieldAlert } from 'lucide-react'
+import type { PM2Process, SiteStatus, SortField, SortDirection } from '../types'
 import ProcessCard from './ProcessCard'
 
-export default function ProcessList({ processes, onAction }: { processes: PM2Process[]; onAction: () => void }) {
+export default function ProcessList({ processes, sites, onAction }: { processes: PM2Process[]; sites: SiteStatus[]; onAction: () => void }) {
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDirection>('asc')
   const [filter, setFilter] = useState<'all' | 'online' | 'errored' | 'stopped'>('all')
 
-  const stats = useMemo(() => ({
-    total: processes.length,
-    online: processes.filter((p) => p.status === 'online').length,
-    errored: processes.filter((p) => p.status === 'errored').length,
-    stopped: processes.filter((p) => p.status === 'stopped').length,
-    problematic: processes.filter((p) => p.restarts > 5 || p.status === 'errored' || (p.status === 'online' && p.httpOk === false)).length,
-  }), [processes])
+  // Build a map: domain -> SiteStatus
+  const siteMap = useMemo(() => {
+    const map = new Map<string, SiteStatus>()
+    for (const site of sites) {
+      map.set(site.domain, site)
+    }
+    return map
+  }, [sites])
+
+  const stats = useMemo(() => {
+    const problematic = processes.filter((p) => {
+      const site = p.httpDomain ? siteMap.get(p.httpDomain) : undefined
+      const sslBad = site?.ssl && !site.ssl.valid
+      return p.restarts > 5 || p.status === 'errored' || (p.status === 'online' && p.httpOk === false) || sslBad
+    })
+    return {
+      total: processes.length,
+      online: processes.filter((p) => p.status === 'online').length,
+      errored: processes.filter((p) => p.status === 'errored').length,
+      stopped: processes.filter((p) => p.status === 'stopped').length,
+      problematic: problematic.length,
+    }
+  }, [processes, siteMap])
+
+  // Domains not linked to any process
+  const orphanSites = useMemo(() => {
+    const linkedDomains = new Set(processes.map(p => p.httpDomain).filter(Boolean))
+    return sites.filter(s => !linkedDomains.has(s.domain))
+  }, [processes, sites])
 
   const filtered = useMemo(() => {
     let result = [...processes]
 
     if (search) {
       const q = search.toLowerCase()
-      result = result.filter((p) => p.name.toLowerCase().includes(q))
+      result = result.filter((p) => {
+        const domain = p.httpDomain ? siteMap.get(p.httpDomain)?.domain : undefined
+        return p.name.toLowerCase().includes(q) || (domain && domain.toLowerCase().includes(q))
+      })
     }
 
     if (filter === 'online') result = result.filter((p) => p.status === 'online')
-    else if (filter === 'errored') result = result.filter((p) => p.status === 'errored' || p.restarts > 5 || (p.status === 'online' && p.httpOk === false))
+    else if (filter === 'errored') result = result.filter((p) => {
+      const site = p.httpDomain ? siteMap.get(p.httpDomain) : undefined
+      const sslBad = site?.ssl && !site.ssl.valid
+      return p.status === 'errored' || p.restarts > 5 || (p.status === 'online' && p.httpOk === false) || sslBad
+    })
     else if (filter === 'stopped') result = result.filter((p) => p.status === 'stopped')
 
     result.sort((a, b) => {
@@ -43,7 +72,7 @@ export default function ProcessList({ processes, onAction }: { processes: PM2Pro
     })
 
     return result
-  }, [processes, search, sortField, sortDir, filter])
+  }, [processes, search, sortField, sortDir, filter, siteMap])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -94,7 +123,7 @@ export default function ProcessList({ processes, onAction }: { processes: PM2Pro
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
             type="text"
-            placeholder="Search processes..."
+            placeholder="Search by process or domain..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-bg-card border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue"
@@ -118,7 +147,7 @@ export default function ProcessList({ processes, onAction }: { processes: PM2Pro
       {/* Process cards */}
       <div className="space-y-2">
         {filtered.map((proc) => (
-          <ProcessCard key={proc.pm_id} process={proc} onAction={onAction} />
+          <ProcessCard key={proc.pm_id} process={proc} site={proc.httpDomain ? siteMap.get(proc.httpDomain) : undefined} onAction={onAction} />
         ))}
         {filtered.length === 0 && (
           <div className="text-center py-8 text-text-muted">
@@ -126,6 +155,59 @@ export default function ProcessList({ processes, onAction }: { processes: PM2Pro
           </div>
         )}
       </div>
+
+      {/* Orphan domains (not linked to any PM2 process) */}
+      {orphanSites.length > 0 && !search && filter === 'all' && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Globe className="w-5 h-5 text-accent-cyan" />
+            <h3 className="text-sm font-semibold text-text-secondary">Other Domains</h3>
+            <span className="text-xs text-text-muted">(no PM2 process linked)</span>
+          </div>
+          <div className="space-y-1">
+            {orphanSites.map((site) => {
+              const hasProblem = !site.httpOk || (site.ssl !== null && !site.ssl.valid)
+              return (
+                <div
+                  key={site.domain}
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-lg bg-bg-card border ${hasProblem ? 'border-accent-red/30' : 'border-border'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${hasProblem ? 'bg-accent-red' : site.ssl && site.ssl.daysLeft <= 14 ? 'bg-accent-yellow' : 'bg-accent-green'}`} />
+                    <span className={`text-sm font-mono ${hasProblem ? 'text-accent-red' : 'text-text-primary'}`}>
+                      {site.domain}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {site.httpOk
+                      ? <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-accent-green/15 text-accent-green">{site.httpStatus}</span>
+                      : <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-accent-red/15 text-accent-red">{site.httpStatus ?? 'DOWN'}</span>
+                    }
+                    {site.ssl ? (
+                      !site.ssl.valid
+                        ? <span className="flex items-center gap-1 text-xs text-accent-red"><ShieldAlert className="w-3.5 h-3.5" /> {site.ssl.daysLeft <= 0 ? 'Expired' : 'Invalid'}</span>
+                        : site.ssl.daysLeft <= 14
+                          ? <span className="flex items-center gap-1 text-xs text-accent-yellow"><ShieldAlert className="w-3.5 h-3.5" /> {site.ssl.daysLeft}d</span>
+                          : <span className="flex items-center gap-1 text-xs text-accent-green"><ShieldAlert className="w-3.5 h-3.5" /> {site.ssl.daysLeft}d</span>
+                    ) : (
+                      <span className="text-xs text-text-muted">No SSL</span>
+                    )}
+                    <span className="text-xs text-text-muted font-mono w-14 text-right">{site.responseTime}ms</span>
+                    <a
+                      href={`https://${site.domain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-text-muted hover:text-accent-blue transition-colors"
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
