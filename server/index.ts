@@ -133,6 +133,9 @@ app.post('/api/processes/:id/stop', async (req, res) => {
 })
 
 app.post('/api/processes/:name/deploy', async (req, res) => {
+  // Deploy can take several minutes (git pull + npm install + build)
+  req.setTimeout(600000)
+  res.setTimeout(600000)
   try {
     const result = await deployProcess(req.params.name)
     res.json(result)

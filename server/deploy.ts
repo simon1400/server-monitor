@@ -1,28 +1,10 @@
 import { exec } from 'child_process'
-import pm2 from 'pm2'
+import { getProcessCwd, restartProcessByName } from './pm2.js'
 
 interface DeployResult {
   success: boolean
   steps: { name: string; success: boolean; output: string }[]
   error?: string
-}
-
-function connectPM2(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    pm2.connect((err) => {
-      if (err) reject(err)
-      else resolve()
-    })
-  })
-}
-
-function listPM2(): Promise<pm2.ProcessDescription[]> {
-  return new Promise((resolve, reject) => {
-    pm2.list((err, list) => {
-      if (err) reject(err)
-      else resolve(list)
-    })
-  })
 }
 
 function execCmd(cmd: string, cwd: string): Promise<{ success: boolean; output: string }> {
@@ -35,25 +17,6 @@ function execCmd(cmd: string, cwd: string): Promise<{ success: boolean; output: 
       }
     })
   })
-}
-
-// Resolve the working directory for a PM2 process
-async function getProcessCwd(processName: string): Promise<string | null> {
-  await connectPM2()
-  try {
-    const list = await listPM2()
-    const proc = list.find((p) => p.name === processName)
-    if (!proc) return null
-    const env = proc.pm2_env as any
-    return env?.pm_cwd || env?.PWD || null
-  } finally {
-    pm2.disconnect()
-  }
-}
-
-// Detect if project uses npm or yarn
-function detectPackageManager(cwd: string): string {
-  return 'npm'
 }
 
 export async function deployProcess(processName: string): Promise<DeployResult> {
@@ -88,17 +51,9 @@ export async function deployProcess(processName: string): Promise<DeployResult> 
 
   // 5. Restart PM2 process
   try {
-    await connectPM2()
-    await new Promise<void>((resolve, reject) => {
-      pm2.restart(processName, (err) => {
-        if (err) reject(err)
-        else resolve()
-      })
-    })
-    pm2.disconnect()
+    await restartProcessByName(processName)
     steps.push({ name: 'pm2 restart', success: true, output: `Process "${processName}" restarted` })
   } catch (err: any) {
-    pm2.disconnect()
     steps.push({ name: 'pm2 restart', success: false, output: err.message })
     return { success: false, steps, error: 'PM2 restart failed' }
   }

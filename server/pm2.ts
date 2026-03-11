@@ -131,3 +131,22 @@ export async function deleteProcess(processId: number): Promise<void> {
     })
   })
 }
+
+export async function getProcessCwd(processName: string): Promise<string | null> {
+  await ensureConnected()
+  const list = await listPM2()
+  const proc = list.find((p) => p.name === processName)
+  if (!proc) return null
+  const env = proc.pm2_env as any
+  return env?.pm_cwd || env?.PWD || null
+}
+
+export async function restartProcessByName(processName: string): Promise<void> {
+  await ensureConnected()
+  return new Promise((resolve, reject) => {
+    pm2.restart(processName, (err) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
