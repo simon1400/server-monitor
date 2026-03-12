@@ -36,7 +36,7 @@ export async function deployProcess(processName: string): Promise<DeployResult> 
   }
 
   // 3. Install dependencies
-  const install = await execCmd('npm install 2>&1', cwd)
+  const install = await execCmd('npm ci 2>&1', cwd)
   steps.push({ name: 'npm install', ...install })
   if (!install.success) {
     return { success: false, steps, error: 'npm install failed' }
