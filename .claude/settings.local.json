@@ -55,7 +55,11 @@
       "Bash(nslookup -type=A ddsirup.co)",
       "Bash(nslookup -type=MX ddsirup.co)",
       "Bash(nslookup -type=CNAME www.ddsirup.co)",
-      "Bash(nslookup -type=A www.ddsirup.co)"
+      "Bash(nslookup -type=A www.ddsirup.co)",
+      "Bash(nslookup ddsirup.co 8.8.8.8)",
+      "Bash(nslookup -type=NS ddsirup.co 8.8.8.8)",
+      "Bash(ipconfig //flushdns)",
+      "Bash(nslookup strapi.ddsirup.co 8.8.8.8)"
     ]
   }
 }

@@ -42,8 +42,13 @@ export async function deployProcess(processName: string): Promise<DeployResult> 
     return { success: false, steps, error: 'npm install failed' }
   }
 
-  // 4. Build (Strapi needs extra heap for webpack)
+  // 4. Clean build artifacts
   const isStrapi = processName.includes('strapi')
+  const cleanDir = isStrapi ? 'dist' : '.next'
+  const clean = await execCmd(`rm -rf ${cleanDir} 2>&1`, cwd)
+  steps.push({ name: `clean ${cleanDir}`, ...clean })
+
+  // 5. Build (Strapi needs extra heap for webpack)
   const buildCmd = isStrapi
     ? 'NODE_OPTIONS="--max-old-space-size=4096" npm run build 2>&1'
     : 'npm run build 2>&1'
@@ -53,7 +58,7 @@ export async function deployProcess(processName: string): Promise<DeployResult> 
     return { success: false, steps, error: 'Build failed' }
   }
 
-  // 5. Restart PM2 process
+  // 6. Restart PM2 process
   try {
     await restartProcessByName(processName)
     steps.push({ name: 'pm2 restart', success: true, output: `Process "${processName}" restarted` })
