@@ -7,9 +7,9 @@ interface DeployResult {
   error?: string
 }
 
-function execCmd(cmd: string, cwd: string): Promise<{ success: boolean; output: string }> {
+function execCmd(cmd: string, cwd: string, env?: Record<string, string>): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
-    exec(cmd, { cwd, timeout: 300000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    exec(cmd, { cwd, timeout: 300000, maxBuffer: 10 * 1024 * 1024, env: { ...process.env, ...env } }, (err, stdout, stderr) => {
       if (err) {
         resolve({ success: false, output: (stderr || stdout || err.message).slice(-2000) })
       } else {
@@ -36,7 +36,7 @@ export async function deployProcess(processName: string): Promise<DeployResult> 
   }
 
   // 3. Install dependencies
-  const install = await execCmd('npm ci 2>&1', cwd)
+  const install = await execCmd('npm ci 2>&1', cwd, { NODE_ENV: 'development' })
   steps.push({ name: 'npm install', ...install })
   if (!install.success) {
     return { success: false, steps, error: 'npm install failed' }
