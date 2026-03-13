@@ -9,6 +9,8 @@ import { checkAllSites, getStaticSites, getDiskUsage, getProcessHttpStatus } fro
 import { deployProcess } from './deploy.js'
 import { getProcessEnv, saveProcessEnv } from './env.js'
 import { authMiddleware, login, logout, checkAuth } from './auth.js'
+import { initVapid, getVapidPublicKey, addPushSubscription, removePushSubscription, getNotificationStatus } from './notifications.js'
+import { startAlerting, getAlertStates } from './alerting.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -208,6 +210,55 @@ app.get('/api/disk-usage', async (_req, res) => {
 })
 
 
+// --- Notification endpoints ---
+
+// Get VAPID public key (needed by frontend to subscribe)
+app.get('/api/notifications/vapid-key', (_req, res) => {
+  const key = getVapidPublicKey()
+  res.json({ key })
+})
+
+// Get notification status
+app.get('/api/notifications/status', (_req, res) => {
+  const status = getNotificationStatus()
+  const alerts = getAlertStates()
+  res.json({ ...status, alerts })
+})
+
+// Subscribe to web push
+app.post('/api/notifications/subscribe', (req, res) => {
+  const { subscription } = req.body
+  if (!subscription?.endpoint || !subscription?.keys) {
+    res.status(400).json({ error: 'Invalid subscription' })
+    return
+  }
+  addPushSubscription(subscription)
+  res.json({ success: true })
+})
+
+// Unsubscribe from web push
+app.post('/api/notifications/unsubscribe', (req, res) => {
+  const { endpoint } = req.body
+  if (!endpoint) {
+    res.status(400).json({ error: 'Missing endpoint' })
+    return
+  }
+  removePushSubscription(endpoint)
+  res.json({ success: true })
+})
+
+// Test notification (sends a test alert)
+app.post('/api/notifications/test', async (_req, res) => {
+  const { sendAlert } = await import('./notifications.js')
+  await sendAlert({
+    level: 'warning',
+    title: 'Test Notification',
+    message: 'If you see this, notifications are working!',
+    tag: 'test',
+  })
+  res.json({ success: true })
+})
+
 // Catch-all for SPA in production
 if (process.env.NODE_ENV === 'production') {
   app.get('/{*splat}', (_req, res) => {
@@ -217,6 +268,10 @@ if (process.env.NODE_ENV === 'production') {
 
 // Start history collection (every 30s)
 startSystemHistoryCollection()
+
+// Init notifications & alerting
+initVapid()
+startAlerting()
 
 app.listen(PORT, () => {
   console.log(`Server Monitor API running on port ${PORT}`)

@@ -1,6 +1,8 @@
-import { Monitor, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { Monitor, RefreshCw, Wifi, WifiOff, Bell } from 'lucide-react'
 import { NavLink } from 'react-router'
 import { formatDistanceToNow } from 'date-fns'
+import { useState } from 'react'
+import NotificationSettings from './NotificationSettings'
 
 interface HeaderProps {
   lastUpdate: number
@@ -17,7 +19,11 @@ const navItems = [
 ]
 
 export default function Header({ lastUpdate, loading, error, onRefresh, processCount }: HeaderProps) {
+  const [showNotifications, setShowNotifications] = useState(false)
+
   return (
+    <>
+    {showNotifications && <NotificationSettings onClose={() => setShowNotifications(false)} />}
     <header className="bg-bg-secondary/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
@@ -69,6 +75,14 @@ export default function Header({ lastUpdate, loading, error, onRefresh, processC
           )}
 
           <button
+            onClick={() => setShowNotifications(true)}
+            className="p-2 rounded-lg hover:bg-bg-card-hover text-text-muted hover:text-text-primary transition-colors"
+            title="Notification settings"
+          >
+            <Bell className="w-4 h-4" />
+          </button>
+
+          <button
             onClick={onRefresh}
             className="p-2 rounded-lg hover:bg-bg-card-hover text-text-muted hover:text-text-primary transition-colors"
             title="Refresh now"
@@ -78,5 +92,6 @@ export default function Header({ lastUpdate, loading, error, onRefresh, processC
         </div>
       </div>
     </header>
+    </>
   )
 }
