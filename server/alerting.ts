@@ -1,6 +1,6 @@
 import { getPM2Processes } from './pm2.js'
 import { checkAllSites, getProcessHttpStatus } from './sites.js'
-import { sendAlert, type AlertLevel } from './notifications.js'
+import { sendAlert } from './notifications.js'
 
 const CHECK_INTERVAL = 30_000 // 30 seconds
 const RESTART_THRESHOLD = 20
@@ -64,7 +64,7 @@ async function runChecks() {
           if (canAlert(`process-down:${key}`)) {
             await sendAlert({
               level: 'critical',
-              title: `${proc.name} is DOWN`,
+              title: `Dan zhodil ${proc.name} - is DOWN`,
               message: `Status: ${proc.status}\nPID: ${proc.pid}`,
               tag: `process-down:${key}`,
             })
@@ -77,7 +77,7 @@ async function runChecks() {
         if (canAlert(`process-up:${key}`)) {
           await sendAlert({
             level: 'recovery',
-            title: `${proc.name} recovered`,
+            title: `Konecne Dimi zvednul ${proc.name} - recovered`,
             message: `Process is back online`,
             tag: `process-up:${key}`,
           })
@@ -90,7 +90,7 @@ async function runChecks() {
           if (canAlert(`http-down:${key}`)) {
             await sendAlert({
               level: 'critical',
-              title: `${proc.name} HTTP failed`,
+              title: `Dan posral HTTP u ${proc.name} - HTTP failed`,
               message: `Domain: ${proc.httpDomain || 'unknown'}\nHTTP status: ${proc.httpStatus || 'no response'}`,
               tag: `http-down:${key}`,
             })
@@ -103,7 +103,7 @@ async function runChecks() {
         if (canAlert(`http-up:${key}`)) {
           await sendAlert({
             level: 'recovery',
-            title: `${proc.name} HTTP recovered`,
+            title: `Konecne Dimi upravil ${proc.name} - HTTP recovered`,
             message: `Domain: ${proc.httpDomain || 'unknown'}`,
             tag: `http-up:${key}`,
           })
@@ -117,7 +117,7 @@ async function runChecks() {
           if (canAlert(`restarts:${key}`)) {
             await sendAlert({
               level: 'warning',
-              title: `${proc.name} high restarts`,
+              title: `Dan furt restartuje ${proc.name} - high restarts`,
               message: `Restart count: ${proc.restarts} (threshold: ${RESTART_THRESHOLD})`,
               tag: `restarts:${key}`,
             })
