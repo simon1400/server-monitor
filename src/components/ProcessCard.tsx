@@ -53,7 +53,6 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
   const [envModalOpen, setEnvModalOpen] = useState(false)
   const isHttpBad = process.status === 'online' && process.httpOk === false
   const isSslBad = site?.ssl !== undefined && site?.ssl !== null && !site.ssl.valid
-  const isSslWarning = site?.ssl?.valid && site.ssl.daysLeft <= 14
   const isProblematic = process.restarts > 20 || process.status === 'errored' || isHttpBad || isSslBad
 
   const handleRestart = async (e: React.MouseEvent) => {
@@ -95,19 +94,19 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
 
   return (
     <div className={`bg-bg-card rounded-xl border transition-all duration-200 ${isProblematic ? 'border-accent-red/50 shadow-[0_0_15px_rgba(239,68,68,0.1)]' : 'border-border hover:border-border/80'}`}>
-      <div className="p-4 cursor-pointer" onClick={() => setExpanded(!expanded)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-2.5 h-2.5 rounded-full ${statusColors[process.status]} ${process.status === 'online' ? 'animate-pulse' : ''}`} />
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-text-primary">{process.name}</h3>
+      <div className="p-3 sm:p-4 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${statusColors[process.status]} ${process.status === 'online' ? 'animate-pulse' : ''}`} />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h3 className="font-semibold text-text-primary text-sm sm:text-base truncate">{process.name}</h3>
                 <span className="text-xs text-text-muted font-mono">#{process.pm_id}</span>
                 {isProblematic && (
                   <AlertTriangle className="w-4 h-4 text-accent-red" />
                 )}
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1 sm:gap-1.5 mt-0.5 flex-wrap">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${statusBg[process.status]}`}>
                   {process.status}
                 </span>
@@ -158,7 +157,7 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 sm:gap-6 shrink-0">
             {/* Metrics */}
             <div className="hidden md:flex items-center gap-6">
               <div className="flex items-center gap-1.5">
@@ -236,17 +235,18 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
         </div>
 
         {/* Mobile metrics */}
-        <div className="flex md:hidden items-center gap-4 mt-3 text-xs">
+        <div className="flex md:hidden items-center gap-2 sm:gap-4 mt-2 sm:mt-3 text-xs flex-wrap">
           <span className="font-mono text-text-secondary">CPU: {process.cpu.toFixed(1)}%</span>
           <span className="font-mono text-text-secondary">MEM: {formatBytes(process.memory)}</span>
-          <span className="font-mono text-text-secondary">↻ {process.restarts}</span>
+          <span className="font-mono text-text-secondary">↑ {formatUptime(process.uptime)}</span>
+          <span className={`font-mono ${process.restarts > 20 ? 'text-accent-red' : 'text-text-secondary'}`}>↻ {process.restarts}</span>
         </div>
       </div>
 
       {/* Expanded details */}
       {expanded && (
         <div className="border-t border-border">
-          <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="p-3 sm:p-4 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm">
             <div>
               <span className="text-text-muted block">PID</span>
               <span className="font-mono text-text-primary">{process.pid}</span>

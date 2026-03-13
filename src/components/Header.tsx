@@ -25,24 +25,24 @@ export default function Header({ lastUpdate, loading, error, onRefresh, processC
     <>
     {showNotifications && <NotificationSettings onClose={() => setShowNotifications(false)} />}
     <header className="bg-bg-secondary/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <Monitor className="w-6 h-6 text-accent-blue" />
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-accent-blue shrink-0" />
             <div>
-              <h1 className="text-lg font-bold text-text-primary">Server Monitor</h1>
-              <p className="text-xs text-text-muted">{processCount} processes</p>
+              <h1 className="text-sm sm:text-lg font-bold text-text-primary whitespace-nowrap">Monitor</h1>
+              <p className="text-[10px] sm:text-xs text-text-muted">{processCount} proc</p>
             </div>
           </div>
 
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-0.5 sm:gap-1">
             {navItems.map(({ to, label }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  `px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-accent-blue/15 text-accent-blue'
                       : 'text-text-muted hover:text-text-primary hover:bg-bg-card-hover'
@@ -55,7 +55,7 @@ export default function Header({ lastUpdate, loading, error, onRefresh, processC
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1 sm:gap-4">
           {error ? (
             <div className="flex items-center gap-1.5 text-accent-red text-sm">
               <WifiOff className="w-4 h-4" />

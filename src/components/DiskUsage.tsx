@@ -26,21 +26,21 @@ function EntryRow({ entry, maxBytes, color }: { entry: DiskUsageEntry; maxBytes:
   const pct = maxBytes > 0 ? (entry.bytes / maxBytes) * 100 : 0
 
   return (
-    <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-bg-card-hover transition-colors">
+    <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg hover:bg-bg-card-hover transition-colors">
       <div className={`w-2 h-2 rounded-full ${color} shrink-0`} />
-      <span className="text-sm font-mono text-text-primary w-36 shrink-0 truncate" title={entry.path}>
+      <span className="text-xs sm:text-sm font-mono text-text-primary w-20 sm:w-36 shrink-0 truncate" title={entry.path}>
         {entry.name}
       </span>
-      <div className="flex-1 h-1.5 bg-bg-primary rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-bg-primary rounded-full overflow-hidden min-w-8">
         <div
           className={`h-full rounded-full transition-all duration-500 ${color}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-sm font-mono text-text-secondary w-20 text-right shrink-0">
+      <span className="text-xs sm:text-sm font-mono text-text-secondary w-14 sm:w-20 text-right shrink-0">
         {entry.size}
       </span>
-      <span className="flex items-center gap-1 text-xs text-text-muted w-44 shrink-0 truncate" title={entry.path}>
+      <span className="hidden sm:flex items-center gap-1 text-xs text-text-muted w-44 shrink-0 truncate" title={entry.path}>
         <FolderOpen className="w-3 h-3 shrink-0" />
         {entry.path}
       </span>
@@ -137,7 +137,7 @@ export default function DiskUsage() {
               )
             })}
           </div>
-          <div className="flex gap-4 mt-2 text-xs text-text-muted">
+          <div className="flex flex-wrap gap-2 sm:gap-4 mt-2 text-xs text-text-muted">
             <span className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full bg-accent-blue inline-block" />
               Projects {formatBytes(projectBytes)}

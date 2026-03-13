@@ -36,10 +36,9 @@ function GaugeBar({ value, max, color, label }: { value: number; max: number; co
 }
 
 export default function SystemOverview({ system }: { system: SystemInfo }) {
-  const memPct = (system.memory.used / system.memory.total) * 100
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
       {/* CPU */}
       <div className="bg-bg-card rounded-xl p-5 border border-border">
         <div className="flex items-center gap-3 mb-4">
@@ -51,7 +50,7 @@ export default function SystemOverview({ system }: { system: SystemInfo }) {
             <p className="text-xs text-text-muted">{system.cpu.brand}</p>
           </div>
         </div>
-        <div className="text-3xl font-bold font-mono mb-3">
+        <div className="text-xl sm:text-3xl font-bold font-mono mb-3">
           {system.cpu.currentLoad.toFixed(1)}%
         </div>
         <GaugeBar value={system.cpu.currentLoad} max={100} color="bg-accent-blue" label={`${system.cpu.cores} cores @ ${system.cpu.speed} GHz`} />
@@ -81,7 +80,7 @@ export default function SystemOverview({ system }: { system: SystemInfo }) {
             <p className="text-xs text-text-muted">{formatBytes(system.memory.total)} total</p>
           </div>
         </div>
-        <div className="text-3xl font-bold font-mono mb-3">
+        <div className="text-xl sm:text-3xl font-bold font-mono mb-3">
           {formatBytes(system.memory.used)}
         </div>
         <GaugeBar value={system.memory.used} max={system.memory.total} color="bg-accent-purple" label="RAM Usage" />
@@ -103,7 +102,7 @@ export default function SystemOverview({ system }: { system: SystemInfo }) {
             <p className="text-xs text-text-muted">{system.disk.mount}</p>
           </div>
         </div>
-        <div className="text-3xl font-bold font-mono mb-3">
+        <div className="text-xl sm:text-3xl font-bold font-mono mb-3">
           {system.disk.use.toFixed(1)}%
         </div>
         <GaugeBar value={system.disk.used} max={system.disk.total} color="bg-accent-cyan" label={`${formatBytes(system.disk.used)} / ${formatBytes(system.disk.total)}`} />

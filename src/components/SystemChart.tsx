@@ -1,14 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useSystemHistory } from '../hooks/useMonitor'
 import { Activity } from 'lucide-react'
 
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatBytes(bytes: number): string {
-  const gb = bytes / (1024 * 1024 * 1024)
-  return gb.toFixed(1) + ' GB'
 }
 
 export default function SystemChart() {
@@ -42,7 +38,7 @@ export default function SystemChart() {
         <h2 className="text-lg font-semibold">System History</h2>
         <span className="text-xs text-text-muted ml-auto">{history.length} data points (30s interval)</span>
       </div>
-      <div className="h-48">
+      <div className="h-40 sm:h-48">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />

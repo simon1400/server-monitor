@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router'
 import { useMonitor } from './hooks/useMonitor'
 import Header from './components/Header'
@@ -45,7 +45,7 @@ function Dashboard() {
   if (!data) return null
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
       <Header
         lastUpdate={lastUpdate}
         loading={loading}
@@ -53,7 +53,7 @@ function Dashboard() {
         onRefresh={refresh}
         processCount={data.processes.length}
       />
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <Routes>
           <Route path="/" element={<OverviewPage data={data} />} />
           <Route path="/apps" element={<ProcessesPage data={data} onAction={refresh} />} />
@@ -67,17 +67,14 @@ function Dashboard() {
 function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const res = await fetch('/api/auth/check')
-      const json = await res.json()
-      setAuthenticated(json.authenticated)
-    } catch {
-      setAuthenticated(false)
-    }
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/auth/check')
+      .then(res => res.json())
+      .then(json => { if (!cancelled) setAuthenticated(json.authenticated) })
+      .catch(() => { if (!cancelled) setAuthenticated(false) })
+    return () => { cancelled = true }
   }, [])
-
-  useEffect(() => { checkAuth() }, [checkAuth])
 
   if (authenticated === null) {
     return (

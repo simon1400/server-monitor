@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Globe, ShieldCheck, ShieldAlert, ShieldX, ExternalLink, RefreshCw, Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Globe, ShieldCheck, ShieldAlert, ShieldX, ExternalLink, RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
 interface SiteSSL {
   valid: boolean
@@ -78,6 +78,7 @@ export default function SitesStatus() {
       if (!res.ok) return
       const data = await res.json()
       setSites(data)
+    // eslint-disable-next-line no-empty
     } catch {} finally {
       setLoading(false)
     }
@@ -95,13 +96,13 @@ export default function SitesStatus() {
 
   return (
     <div className="bg-bg-card rounded-xl border border-border p-5 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Globe className="w-5 h-5 text-accent-cyan" />
-          <h2 className="text-lg font-semibold">Sites & SSL</h2>
-          <span className="text-xs text-text-muted">{sites.length} domains</span>
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Globe className="w-5 h-5 text-accent-cyan shrink-0" />
+          <h2 className="text-base sm:text-lg font-semibold whitespace-nowrap">Sites & SSL</h2>
+          <span className="text-xs text-text-muted hidden sm:inline">{sites.length} domains</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {problems.length > 0 && (
             <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-accent-red/15 text-accent-red font-medium">
               <XCircle className="w-3.5 h-3.5" /> {problems.length} problem{problems.length > 1 ? 's' : ''}
@@ -135,19 +136,19 @@ export default function SitesStatus() {
             return (
               <div key={site.domain}>
                 <div
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${hasProblem ? 'bg-accent-red/5 hover:bg-accent-red/10' : 'hover:bg-bg-card-hover'}`}
+                  className={`flex items-center justify-between gap-2 px-2 sm:px-3 py-2 rounded-lg cursor-pointer transition-colors ${hasProblem ? 'bg-accent-red/5 hover:bg-accent-red/10' : 'hover:bg-bg-card-hover'}`}
                   onClick={() => setExpanded(isExpanded ? null : site.domain)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${hasProblem ? 'bg-accent-red' : site.ssl && site.ssl.daysLeft <= 14 ? 'bg-accent-yellow' : 'bg-accent-green'}`} />
-                    <span className={`text-sm font-mono ${hasProblem ? 'text-accent-red' : 'text-text-primary'}`}>
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${hasProblem ? 'bg-accent-red' : site.ssl && site.ssl.daysLeft <= 14 ? 'bg-accent-yellow' : 'bg-accent-green'}`} />
+                    <span className={`text-xs sm:text-sm font-mono truncate ${hasProblem ? 'text-accent-red' : 'text-text-primary'}`}>
                       {site.domain}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                     <HttpBadge status={site.httpStatus} ok={site.httpOk} />
-                    <SSLBadge ssl={site.ssl} />
-                    <span className="text-xs text-text-muted font-mono w-14 text-right">
+                    <span className="hidden sm:inline-flex"><SSLBadge ssl={site.ssl} /></span>
+                    <span className="text-xs text-text-muted font-mono hidden sm:block w-14 text-right">
                       {site.responseTime}ms
                     </span>
                     <a
@@ -163,7 +164,7 @@ export default function SitesStatus() {
                 </div>
 
                 {isExpanded && (
-                  <div className="ml-8 mr-3 mt-1 mb-2 p-3 bg-bg-primary rounded-lg text-xs space-y-2">
+                  <div className="ml-4 sm:ml-8 mr-1 sm:mr-3 mt-1 mb-2 p-2 sm:p-3 bg-bg-primary rounded-lg text-xs space-y-2">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
                         <span className="text-text-muted block">HTTP Status</span>

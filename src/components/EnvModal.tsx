@@ -117,7 +117,7 @@ export default function EnvModal({ processName, onClose, onSaved }: EnvModalProp
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-bg-card border border-border rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl mx-4"
+        className="bg-bg-card border border-border rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl mx-2 sm:mx-4"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -143,13 +143,13 @@ export default function EnvModal({ processName, onClose, onSaved }: EnvModalProp
                 <p className="text-sm text-text-muted text-center py-8">No .env file found. Add variables below.</p>
               )}
               {entries.map((entry, i) => (
-                <div key={i} className="flex items-center gap-2 group">
+                <div key={i} className="flex items-center gap-1.5 sm:gap-2 group">
                   <input
                     type="text"
                     value={entry.key}
                     onChange={e => updateEntry(i, 'key', e.target.value)}
                     placeholder="KEY"
-                    className="w-[35%] shrink-0 bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
+                    className="w-[30%] sm:w-[35%] shrink-0 bg-bg-secondary border border-border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
                   />
                   <div className="flex-1 relative">
                     <input
@@ -157,7 +157,7 @@ export default function EnvModal({ processName, onClose, onSaved }: EnvModalProp
                       value={entry.value}
                       onChange={e => updateEntry(i, 'value', e.target.value)}
                       placeholder="value"
-                      className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 pr-9 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
+                      className="w-full bg-bg-secondary border border-border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 pr-8 sm:pr-9 text-xs sm:text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
                     />
                     <button
                       type="button"
@@ -169,7 +169,7 @@ export default function EnvModal({ processName, onClose, onSaved }: EnvModalProp
                   </div>
                   <button
                     onClick={() => removeEntry(i)}
-                    className="p-2 rounded-lg text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

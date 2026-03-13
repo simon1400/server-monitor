@@ -46,14 +46,14 @@ export default function StaticSites() {
         {sites.map((site) => (
           <div
             key={site.domain}
-            className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-bg-card-hover transition-colors"
+            className="flex items-center justify-between gap-2 px-2 sm:px-3 py-2 rounded-lg hover:bg-bg-card-hover transition-colors"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-accent-purple" />
-              <span className="text-sm font-mono text-text-primary">{site.domain}</span>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-accent-purple shrink-0" />
+              <span className="text-xs sm:text-sm font-mono text-text-primary truncate">{site.domain}</span>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1 text-xs text-text-muted" title={site.root}>
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+              <span className="hidden sm:flex items-center gap-1 text-xs text-text-muted" title={site.root}>
                 <FolderOpen className="w-3.5 h-3.5" />
                 {site.root.split('/').slice(-2).join('/')}
               </span>
@@ -62,11 +62,11 @@ export default function StaticSites() {
                 {site.diskUsage}
               </span>
               {site.ssl ? (
-                <span className="flex items-center gap-1 text-xs text-accent-green">
+                <span className="hidden sm:flex items-center gap-1 text-xs text-accent-green">
                   <ShieldCheck className="w-3.5 h-3.5" /> SSL
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-accent-yellow">
+                <span className="hidden sm:flex items-center gap-1 text-xs text-accent-yellow">
                   <ShieldX className="w-3.5 h-3.5" /> No SSL
                 </span>
               )}

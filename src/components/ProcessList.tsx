@@ -122,23 +122,23 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
   return (
     <div>
       {/* Stats bar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 mb-4">
         <button
           onClick={() => setFilter('all')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === 'all' ? 'bg-accent-blue/20 text-accent-blue' : 'text-text-secondary hover:bg-bg-card-hover'}`}
+          className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm transition-colors ${filter === 'all' ? 'bg-accent-blue/20 text-accent-blue' : 'text-text-secondary hover:bg-bg-card-hover'}`}
         >
           All <span className="font-mono">{stats.total}</span>
         </button>
         <button
           onClick={() => setFilter('online')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === 'online' ? 'bg-accent-green/20 text-accent-green' : 'text-text-secondary hover:bg-bg-card-hover'}`}
+          className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm transition-colors ${filter === 'online' ? 'bg-accent-green/20 text-accent-green' : 'text-text-secondary hover:bg-bg-card-hover'}`}
         >
           <CheckCircle className="w-3.5 h-3.5" /> Online <span className="font-mono">{stats.online}</span>
         </button>
         {stats.problematic > 0 && (
           <button
             onClick={() => setFilter('errored')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === 'errored' ? 'bg-accent-red/20 text-accent-red' : 'text-accent-red/70 hover:bg-bg-card-hover'}`}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm transition-colors ${filter === 'errored' ? 'bg-accent-red/20 text-accent-red' : 'text-accent-red/70 hover:bg-bg-card-hover'}`}
           >
             <AlertTriangle className="w-3.5 h-3.5" /> Problems <span className="font-mono">{stats.problematic}</span>
           </button>
@@ -146,7 +146,7 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
         {stats.stopped > 0 && (
           <button
             onClick={() => setFilter('stopped')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${filter === 'stopped' ? 'bg-text-muted/20 text-text-muted' : 'text-text-secondary hover:bg-bg-card-hover'}`}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm transition-colors ${filter === 'stopped' ? 'bg-text-muted/20 text-text-muted' : 'text-text-secondary hover:bg-bg-card-hover'}`}
           >
             <XCircle className="w-3.5 h-3.5" /> Stopped <span className="font-mono">{stats.stopped}</span>
           </button>
@@ -154,8 +154,8 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
       </div>
 
       {/* Search & Sort */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="relative flex-1 min-w-50">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+        <div className="relative flex-1 min-w-0 w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
             type="text"
@@ -206,19 +206,20 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
               return (
                 <div
                   key={site.domain}
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-lg bg-bg-card border ${hasProblem ? 'border-accent-red/30' : 'border-border'}`}
+                  className={`flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 rounded-lg bg-bg-card border ${hasProblem ? 'border-accent-red/30' : 'border-border'}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${hasProblem ? 'bg-accent-red' : site.ssl && site.ssl.daysLeft <= 14 ? 'bg-accent-yellow' : 'bg-accent-green'}`} />
-                    <span className={`text-sm font-mono ${hasProblem ? 'text-accent-red' : 'text-text-primary'}`}>
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${hasProblem ? 'bg-accent-red' : site.ssl && site.ssl.daysLeft <= 14 ? 'bg-accent-yellow' : 'bg-accent-green'}`} />
+                    <span className={`text-xs sm:text-sm font-mono truncate ${hasProblem ? 'text-accent-red' : 'text-text-primary'}`}>
                       {site.domain}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                     {site.httpOk
                       ? <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-accent-green/15 text-accent-green">{site.httpStatus}</span>
                       : <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-accent-red/15 text-accent-red">{site.httpStatus ?? 'DOWN'}</span>
                     }
+                    <span className="hidden sm:inline-flex">
                     {site.ssl ? (
                       !site.ssl.valid
                         ? <span className="flex items-center gap-1 text-xs text-accent-red"><ShieldAlert className="w-3.5 h-3.5" /> {site.ssl.daysLeft <= 0 ? 'Expired' : 'Invalid'}</span>
@@ -228,7 +229,8 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
                     ) : (
                       <span className="text-xs text-text-muted">No SSL</span>
                     )}
-                    <span className="text-xs text-text-muted font-mono w-14 text-right">{site.responseTime}ms</span>
+                    </span>
+                    <span className="text-xs text-text-muted font-mono hidden sm:block w-14 text-right">{site.responseTime}ms</span>
                     <a
                       href={`https://${site.domain}`}
                       target="_blank"
