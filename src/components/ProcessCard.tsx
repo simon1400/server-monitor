@@ -1,7 +1,7 @@
-import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2, Globe, ShieldCheck, ShieldAlert, ShieldX, ExternalLink, FileCode } from 'lucide-react'
+import { RotateCw, CircleStop, ChevronDown, ChevronUp, AlertTriangle, Clock, Cpu, MemoryStick, Rocket, CheckCircle, XCircle, Loader2, Globe, ShieldCheck, ShieldAlert, ShieldX, ExternalLink, FileCode, TimerReset } from 'lucide-react'
 import { useState } from 'react'
 import type { PM2Process, SiteStatus } from '../types'
-import { restartProcess, stopProcess, deployProcess } from '../hooks/useMonitor'
+import { restartProcess, stopProcess, deployProcess, resetRestarts } from '../hooks/useMonitor'
 import ProcessLogs from './ProcessLogs'
 import EnvModal from './EnvModal'
 
@@ -54,7 +54,7 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
   const isHttpBad = process.status === 'online' && process.httpOk === false
   const isSslBad = site?.ssl !== undefined && site?.ssl !== null && !site.ssl.valid
   const isSslWarning = site?.ssl?.valid && site.ssl.daysLeft <= 14
-  const isProblematic = process.restarts > 5 || process.status === 'errored' || isHttpBad || isSslBad
+  const isProblematic = process.restarts > 20 || process.status === 'errored' || isHttpBad || isSslBad
 
   const handleRestart = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -69,6 +69,14 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
     if (!confirm(`Stop "${process.name}"?`)) return
     setActionLoading(true)
     await stopProcess(process.pm_id)
+    setTimeout(onAction, 1500)
+    setActionLoading(false)
+  }
+
+  const handleResetRestarts = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setActionLoading(true)
+    await resetRestarts(process.pm_id)
     setTimeout(onAction, 1500)
     setActionLoading(false)
   }
@@ -169,9 +177,19 @@ export default function ProcessCard({ process, site, onAction }: { process: PM2P
               </div>
               <div className="flex items-center gap-1.5">
                 <RotateCw className="w-3.5 h-3.5 text-text-muted" />
-                <span className={`font-mono text-sm ${process.restarts > 5 ? 'text-accent-red font-bold' : 'text-text-secondary'}`}>
+                <span className={`font-mono text-sm ${process.restarts > 20 ? 'text-accent-red font-bold' : 'text-text-secondary'}`}>
                   {process.restarts}
                 </span>
+                {process.restarts > 0 && (
+                  <button
+                    onClick={handleResetRestarts}
+                    disabled={actionLoading}
+                    className="p-0.5 rounded hover:bg-accent-yellow/10 text-text-muted hover:text-accent-yellow transition-colors disabled:opacity-50"
+                    title="Reset restart counter"
+                  >
+                    <TimerReset className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 

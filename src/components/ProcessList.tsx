@@ -54,7 +54,7 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
     const problematic = processes.filter((p) => {
       const site = processSiteMap.get(p.pm_id)
       const sslBad = site?.ssl && !site.ssl.valid
-      return p.restarts > 5 || p.status === 'errored' || (p.status === 'online' && p.httpOk === false) || sslBad
+      return p.restarts > 20 || p.status === 'errored' || (p.status === 'online' && p.httpOk === false) || sslBad
     })
     return {
       total: processes.length,
@@ -90,7 +90,7 @@ export default function ProcessList({ processes, sites, onAction }: { processes:
     else if (filter === 'errored') result = result.filter((p) => {
       const site = processSiteMap.get(p.pm_id)
       const sslBad = site?.ssl && !site.ssl.valid
-      return p.status === 'errored' || p.restarts > 5 || (p.status === 'online' && p.httpOk === false) || sslBad
+      return p.status === 'errored' || p.restarts > 20 || (p.status === 'online' && p.httpOk === false) || sslBad
     })
     else if (filter === 'stopped') result = result.filter((p) => p.status === 'stopped')
 

@@ -141,6 +141,16 @@ export async function getProcessCwd(processName: string): Promise<string | null>
   return env?.pm_cwd || env?.PWD || null
 }
 
+export async function resetProcessRestarts(processId: number): Promise<void> {
+  await ensureConnected()
+  return new Promise((resolve, reject) => {
+    pm2.reset(processId as any, (err: any) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
+
 export async function restartProcessByName(processName: string): Promise<void> {
   await ensureConnected()
   return new Promise((resolve, reject) => {

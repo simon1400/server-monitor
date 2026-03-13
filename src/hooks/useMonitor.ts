@@ -121,6 +121,15 @@ export async function saveProcessEnv(name: string, entries: { key: string; value
   }
 }
 
+export async function resetRestarts(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/processes/${id}/reset-restarts`, { method: 'POST' })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 export async function deployProcess(name: string): Promise<any> {
   try {
     const res = await fetch(`${API_BASE}/processes/${encodeURIComponent(name)}/deploy`, { method: 'POST' })

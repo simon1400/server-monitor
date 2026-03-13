@@ -3,7 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { getPM2Processes, getPM2Logs, restartProcess, stopProcess } from './pm2.js'
+import { getPM2Processes, getPM2Logs, restartProcess, stopProcess, resetProcessRestarts } from './pm2.js'
 import { getSystemInfo, getSystemHistory, startSystemHistoryCollection } from './system.js'
 import { checkAllSites, getStaticSites, getDiskUsage, getProcessHttpStatus } from './sites.js'
 import { deployProcess } from './deploy.js'
@@ -129,6 +129,15 @@ app.post('/api/processes/:id/stop', async (req, res) => {
     res.json({ success: true })
   } catch {
     res.status(500).json({ error: 'Failed to stop process' })
+  }
+})
+
+app.post('/api/processes/:id/reset-restarts', async (req, res) => {
+  try {
+    await resetProcessRestarts(parseInt(req.params.id))
+    res.json({ success: true })
+  } catch {
+    res.status(500).json({ error: 'Failed to reset restart counter' })
   }
 })
 
