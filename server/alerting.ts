@@ -64,8 +64,8 @@ async function runChecks() {
           if (canAlert(`process-down:${key}`)) {
             await sendAlert({
               level: 'critical',
-              title: `Dan zhodil ${proc.name} - is DOWN`,
-              message: `Status: ${proc.status}\nPID: ${proc.pid}`,
+              title: ` ${proc.name} is DOWN`,
+              message: `Dan zhodil: ${proc.status}\nPID: ${proc.pid}`,
               tag: `process-down:${key}`,
             })
           }
@@ -77,8 +77,8 @@ async function runChecks() {
         if (canAlert(`process-up:${key}`)) {
           await sendAlert({
             level: 'recovery',
-            title: `Konecne Dimi zvednul ${proc.name} - recovered`,
-            message: `Process is back online`,
+            title: ` ${proc.name} recovered`,
+            message: `Konecne Dimi zvednul process`,
             tag: `process-up:${key}`,
           })
         }
@@ -90,8 +90,8 @@ async function runChecks() {
           if (canAlert(`http-down:${key}`)) {
             await sendAlert({
               level: 'critical',
-              title: `Dan posral HTTP u ${proc.name} - HTTP failed`,
-              message: `Domain: ${proc.httpDomain || 'unknown'}\nHTTP status: ${proc.httpStatus || 'no response'}`,
+              title: ` ${proc.name} HTTP failed`,
+              message: `Dan posral HTTP u domain: ${proc.httpDomain || 'unknown'}\nHTTP status: ${proc.httpStatus || 'no response'}`,
               tag: `http-down:${key}`,
             })
           }
@@ -103,8 +103,8 @@ async function runChecks() {
         if (canAlert(`http-up:${key}`)) {
           await sendAlert({
             level: 'recovery',
-            title: `Konecne Dimi upravil ${proc.name} - HTTP recovered`,
-            message: `Domain: ${proc.httpDomain || 'unknown'}`,
+            title: `${proc.name} HTTP recovered`,
+            message: `Konecne Dimi upravil domain: ${proc.httpDomain || 'unknown'}`,
             tag: `http-up:${key}`,
           })
         }
@@ -117,8 +117,8 @@ async function runChecks() {
           if (canAlert(`restarts:${key}`)) {
             await sendAlert({
               level: 'warning',
-              title: `Dan furt restartuje ${proc.name} - high restarts`,
-              message: `Restart count: ${proc.restarts} (threshold: ${RESTART_THRESHOLD})`,
+              title: `${proc.name} high restarts`,
+              message: `Dan furt restartuje: ${proc.restarts} (threshold: ${RESTART_THRESHOLD})`,
               tag: `restarts:${key}`,
             })
           }
