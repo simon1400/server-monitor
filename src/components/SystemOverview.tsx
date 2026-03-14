@@ -84,6 +84,11 @@ export default function SystemOverview({ system }: { system: SystemInfo }) {
           {formatBytes(system.memory.used)}
         </div>
         <GaugeBar value={system.memory.used} max={system.memory.total} color="bg-accent-purple" label="RAM Usage" />
+        {system.memory.buffCache > 0 && (
+          <p className="text-xs text-text-muted mt-1">
+            Buffer/Cache: {formatBytes(system.memory.buffCache)}
+          </p>
+        )}
         {system.memory.swapTotal > 0 && (
           <div className="mt-2">
             <GaugeBar value={system.memory.swapUsed} max={system.memory.swapTotal} color="bg-accent-yellow" label={`Swap (${formatBytes(system.memory.swapTotal)})`} />

@@ -38,6 +38,7 @@ export interface SystemInfo {
     used: number
     free: number
     available: number
+    buffCache: number
     swapTotal: number
     swapUsed: number
   }

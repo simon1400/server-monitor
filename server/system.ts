@@ -43,9 +43,10 @@ export async function getSystemInfo(): Promise<SystemInfo> {
     },
     memory: {
       total: mem.total,
-      used: mem.used,
+      used: mem.active,
       free: mem.free,
       available: mem.available,
+      buffCache: mem.buffcache,
       swapTotal: mem.swaptotal,
       swapUsed: mem.swapused,
     },
@@ -87,7 +88,7 @@ async function collectHistoryPoint() {
     history.push({
       timestamp: Date.now(),
       cpuLoad: cpuLoad.currentLoad,
-      memoryUsed: mem.used,
+      memoryUsed: mem.active,
       memoryTotal: mem.total,
       networkRx: netStats.rx_sec ?? 0,
       networkTx: netStats.tx_sec ?? 0,
