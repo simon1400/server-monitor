@@ -15,7 +15,6 @@ interface HeaderProps {
 const navItems = [
   { to: '/', label: 'Overview' },
   { to: '/apps', label: 'Apps' },
-  { to: '/seo', label: 'SEO' },
   { to: '/disk', label: 'Disk' },
 ]
 

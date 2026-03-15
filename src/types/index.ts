@@ -92,29 +92,5 @@ export interface MonitorData {
   timestamp: number
 }
 
-export interface LighthouseMetrics {
-  fcp: number
-  lcp: number
-  cls: number
-  tbt: number
-  si: number
-}
-
-export interface LighthouseResult {
-  performance: number
-  accessibility: number
-  bestPractices: number
-  seo: number
-  metrics: LighthouseMetrics
-}
-
-export interface SeoResult {
-  domain: string
-  mobile: LighthouseResult | null
-  desktop: LighthouseResult | null
-  lastChecked: number
-  error: string | null
-}
-
 export type SortField = 'name' | 'cpu' | 'memory' | 'uptime' | 'restarts' | 'status'
 export type SortDirection = 'asc' | 'desc'
