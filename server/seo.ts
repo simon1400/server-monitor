@@ -60,7 +60,9 @@ function parsePsiResponse(data: any): LighthouseResult | null {
 
 async function fetchPsi(url: string, strategy: 'mobile' | 'desktop'): Promise<LighthouseResult | null> {
   const categories = 'performance,accessibility,best-practices,seo'
-  const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}&category=${categories}`
+  const apiKey = process.env.PSI_API_KEY
+  const keyParam = apiKey ? `&key=${apiKey}` : ''
+  const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=${strategy}&category=${categories}${keyParam}`
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 120000) // 2min timeout
@@ -131,5 +133,6 @@ export function isDomainScanning(domain: string): boolean {
 }
 
 export async function getSeoDomainsForScan(): Promise<string[]> {
-  return getNginxDomains()
+  const domains = await getNginxDomains()
+  return domains.filter(d => !d.includes('strapi') && !d.includes('admin'))
 }
