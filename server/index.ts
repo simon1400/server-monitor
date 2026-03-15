@@ -9,6 +9,7 @@ import { checkAllSites, getStaticSites, getDiskUsage, getProcessHttpStatus } fro
 import { deployProcess } from './deploy.js'
 import { getProcessEnv, saveProcessEnv } from './env.js'
 import { authMiddleware, login, logout, checkAuth } from './auth.js'
+import { getSeoResults, scanDomain, getSeoDomainsForScan, isDomainScanning } from './seo.js'
 import { initVapid, getVapidPublicKey, addPushSubscription, removePushSubscription, getNotificationStatus } from './notifications.js'
 import { startAlerting, getAlertStates } from './alerting.js'
 
@@ -257,6 +258,34 @@ app.post('/api/notifications/test', async (_req, res) => {
     tag: 'test',
   })
   res.json({ success: true })
+})
+
+// --- SEO endpoints ---
+
+// Get all cached SEO results + available domains
+app.get('/api/seo', async (_req, res) => {
+  try {
+    const [results, domains] = await Promise.all([
+      Promise.resolve(getSeoResults()),
+      getSeoDomainsForScan(),
+    ])
+    const scanning = domains.filter(d => isDomainScanning(d))
+    res.json({ results, domains, scanning })
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch SEO data' })
+  }
+})
+
+// Scan a single domain
+app.post('/api/seo/:domain/scan', async (req, res) => {
+  req.setTimeout(300000)
+  res.setTimeout(300000)
+  try {
+    const result = await scanDomain(req.params.domain)
+    res.json(result)
+  } catch {
+    res.status(500).json({ error: 'Scan failed' })
+  }
 })
 
 // Catch-all for SPA in production

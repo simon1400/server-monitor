@@ -4,6 +4,7 @@ import { useMonitor } from './hooks/useMonitor'
 import Header from './components/Header'
 import OverviewPage from './pages/OverviewPage'
 import DiskPage from './pages/DiskPage'
+import SeoPage from './pages/SeoPage'
 import ProcessesPage from './pages/ProcessesPage'
 import LoginPage from './components/LoginPage'
 import { Loader2 } from 'lucide-react'
@@ -57,6 +58,7 @@ function Dashboard() {
         <Routes>
           <Route path="/" element={<OverviewPage data={data} />} />
           <Route path="/apps" element={<ProcessesPage data={data} onAction={refresh} />} />
+          <Route path="/seo" element={<SeoPage />} />
           <Route path="/disk" element={<DiskPage />} />
         </Routes>
       </main>

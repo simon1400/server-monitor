@@ -62,7 +62,10 @@
       "Bash(nslookup strapi.ddsirup.co 8.8.8.8)",
       "Bash(npx vite:*)",
       "Bash(node scripts/generate-vapid-keys.js)",
-      "WebFetch(domain:api.telegram.org)"
+      "WebFetch(domain:api.telegram.org)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
