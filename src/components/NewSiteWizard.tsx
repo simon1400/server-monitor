@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, Loader2, CheckCircle, XCircle, Globe, FileArchive, ArrowRight, PartyPopper } from 'lucide-react'
 import { createSite, uploadZip, setupDomain } from '../hooks/useHosting'
 import type { StepResult } from '../types/hosting'
+import panicMeme from '../assets/panic-www.png'
 
 interface Props {
   onClose: () => void
@@ -47,17 +48,17 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
 
   const createAndNext = async () => {
     setError(null)
-    if (!name.trim()) { setError('Введите название сайта'); return }
+    if (!name.trim()) { setError('Enter a site name'); return }
     setBusy(true)
     const res = await createSite(name.trim(), domain.trim())
     setBusy(false)
-    if (!res.success || !res.slug) { setError(res.error || 'Не удалось создать сайт'); return }
+    if (!res.success || !res.slug) { setError(res.error || 'Failed to create site'); return }
     setSlug(res.slug)
     setStep(2)
   }
 
   const doUpload = async () => {
-    if (!file) { setError('Выберите .zip архив'); return }
+    if (!file) { setError('Select a .zip archive'); return }
     setError(null)
     setBusy(true)
     setProgress(0)
@@ -69,7 +70,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
   }
 
   const doDomain = async () => {
-    if (!domain.trim()) { setError('Введите домен'); return }
+    if (!domain.trim()) { setError('Enter a domain'); return }
     setError(null)
     setBusy(true)
     setDomainResult(null)
@@ -86,14 +87,14 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
     if (f) setFile(f)
   }
 
-  const steps = ['Сайт', 'Файлы', 'Домен', 'Готово']
+  const steps = ['Site', 'Files', 'Domain', 'Done']
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-bg-card border border-border rounded-xl w-full max-w-xl max-h-[88vh] flex flex-col shadow-2xl mx-2 sm:mx-4" onClick={e => e.stopPropagation()}>
         {/* Header + step indicator */}
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-semibold text-text-primary">Новый сайт</h2>
+          <h2 className="text-lg font-semibold text-text-primary">New site</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -127,24 +128,24 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
           {step === 1 && (
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-text-secondary block mb-1.5">Название</label>
+                <label className="text-sm text-text-secondary block mb-1.5">Name</label>
                 <input
                   autoFocus
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="Например: Ducati 100"
+                  placeholder="e.g. Ducati 100"
                   className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
                 />
               </div>
               <div>
-                <label className="text-sm text-text-secondary block mb-1.5">Домен <span className="text-text-muted">(можно указать позже)</span></label>
+                <label className="text-sm text-text-secondary block mb-1.5">Domain <span className="text-text-muted">(optional, can set later)</span></label>
                 <input
                   value={domain}
                   onChange={e => setDomain(e.target.value)}
-                  placeholder="example.cz"
+                  placeholder="example.com"
                   className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
                 />
-                <p className="text-xs text-text-muted mt-1.5">Домен должен указывать (A-запись) на этот сервер.</p>
+                <p className="text-xs text-text-muted mt-1.5">The domain must point (A record) to this server.</p>
               </div>
             </div>
           )}
@@ -152,7 +153,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
           {/* Step 2 */}
           {step === 2 && (
             <div className="space-y-3">
-              <p className="text-sm text-text-secondary">Загрузите .zip с файлами сайта (внутри должен быть <span className="font-mono text-text-primary">index.html</span>).</p>
+              <p className="text-sm text-text-secondary">Upload a .zip with the site files (it must contain <span className="font-mono text-text-primary">index.html</span>).</p>
               <label
                 onDragOver={e => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
@@ -163,7 +164,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
                 {file ? (
                   <span className="text-sm text-text-primary font-medium">{file.name} <span className="text-text-muted">({(file.size / 1024 / 1024).toFixed(1)} MB)</span></span>
                 ) : (
-                  <span className="text-sm text-text-muted">Перетащите .zip сюда или нажмите для выбора</span>
+                  <span className="text-sm text-text-muted">Drag a .zip here or click to choose</span>
                 )}
                 <input type="file" accept=".zip,application/zip" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
               </label>
@@ -172,7 +173,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
                   <div className="h-2 bg-bg-secondary rounded-full overflow-hidden">
                     <div className="h-full bg-accent-blue transition-all" style={{ width: `${progress}%` }} />
                   </div>
-                  <p className="text-xs text-text-muted mt-1">{progress < 100 ? `Загрузка ${progress}%` : 'Распаковка на сервере…'}</p>
+                  <p className="text-xs text-text-muted mt-1">{progress < 100 ? `Uploading ${progress}%` : 'Extracting on server…'}</p>
                 </div>
               )}
               {uploadResult && <StepLog result={uploadResult} />}
@@ -182,23 +183,26 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
           {/* Step 3 */}
           {step === 3 && (
             <div className="space-y-4">
-              <p className="text-sm text-text-secondary">Подключим домен и выпустим бесплатный SSL (Let's Encrypt).</p>
+              <p className="text-sm text-text-secondary">We'll connect the domain and issue a free SSL certificate (Let's Encrypt).</p>
               <div>
-                <label className="text-sm text-text-secondary block mb-1.5">Домен</label>
+                <label className="text-sm text-text-secondary block mb-1.5">Domain</label>
                 <input
                   value={domain}
                   onChange={e => setDomain(e.target.value)}
-                  placeholder="example.cz"
+                  placeholder="example.com"
                   className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
                 />
               </div>
               <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
                 <input type="checkbox" checked={www} onChange={e => setWww(e.target.checked)} className="accent-accent-blue w-4 h-4" />
-                Также подключить <span className="font-mono text-text-primary">www.{domain || 'example.cz'}</span>
+                Also connect <span className="font-mono text-text-primary">www.{domain || 'example.com'}</span>
               </label>
-              <p className="text-xs text-text-muted">Проверим DNS → создадим nginx-конфиг → выпустим сертификат → перезагрузим nginx.</p>
+              <p className="text-xs text-text-muted">We'll check DNS → create the nginx config → issue the certificate → reload nginx.</p>
               {busy && (
-                <div className="flex items-center gap-2 text-sm text-accent-blue"><Loader2 className="w-4 h-4 animate-spin" /> Настройка домена и SSL… (может занять до минуты)</div>
+                <div className="flex flex-col items-center gap-3 py-2">
+                  <img src={panicMeme} alt="" className="w-full max-w-xs rounded-xl border border-border shadow-lg" />
+                  <div className="flex items-center gap-2 text-sm text-accent-blue"><Loader2 className="w-4 h-4 animate-spin" /> Setting up domain &amp; SSL… (can take up to a minute)</div>
+                </div>
               )}
               {domainResult && <StepLog result={domainResult} />}
             </div>
@@ -208,11 +212,11 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
           {step === 4 && (
             <div className="flex flex-col items-center text-center py-6 gap-3">
               <PartyPopper className="w-12 h-12 text-accent-green" />
-              <h3 className="text-lg font-semibold text-text-primary">Сайт опубликован!</h3>
+              <h3 className="text-lg font-semibold text-text-primary">Site published!</h3>
               <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline flex items-center gap-1 font-mono">
                 <Globe className="w-4 h-4" /> https://{domain}
               </a>
-              <p className="text-sm text-text-muted">Файлы можно править в карточке сайта в любой момент.</p>
+              <p className="text-sm text-text-muted">You can edit files from the site card anytime.</p>
             </div>
           )}
         </div>
@@ -220,33 +224,33 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
         {/* Footer */}
         <div className="border-t border-border p-4 shrink-0 flex items-center justify-between">
           <button onClick={onClose} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors">
-            {step === 4 ? 'Закрыть' : 'Отмена'}
+            {step === 4 ? 'Close' : 'Cancel'}
           </button>
           <div className="flex items-center gap-2">
             {step === 1 && (
               <button onClick={createAndNext} disabled={busy} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Далее
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Next
               </button>
             )}
             {step === 2 && (
               <>
-                <button onClick={() => setStep(3)} disabled={busy} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Пропустить</button>
+                <button onClick={() => setStep(3)} disabled={busy} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Skip</button>
                 <button onClick={doUpload} disabled={busy || !file} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Загрузить
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Upload
                 </button>
               </>
             )}
             {step === 3 && (
               <>
-                <button onClick={() => setStep(4)} disabled={busy} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Пропустить</button>
+                <button onClick={() => setStep(4)} disabled={busy} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Skip</button>
                 <button onClick={doDomain} disabled={busy || !domain.trim()} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />} Подключить
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />} Connect
                 </button>
               </>
             )}
             {step === 4 && (
               <button onClick={onDone} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-green hover:bg-accent-green/90 text-white rounded-lg transition-colors">
-                <CheckCircle className="w-4 h-4" /> Готово
+                <CheckCircle className="w-4 h-4" /> Done
               </button>
             )}
           </div>

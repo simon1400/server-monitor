@@ -40,7 +40,7 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
   const statusColor = !site.domain ? 'bg-text-muted' : httpOk === false ? 'bg-accent-red' : httpOk ? 'bg-accent-green' : 'bg-accent-yellow'
 
   const handleReupload = async (file: File) => {
-    if (!confirm(`Перезалить "${site.name}"?\n\nТекущие файлы будут заменены содержимым архива (бэкап создаётся автоматически).`)) return
+    if (!confirm(`Re-upload "${site.name}"?\n\nCurrent files will be replaced with the archive contents (a backup is created automatically).`)) return
     setExpanded(true)
     setProgress(0)
     setUploadResult(null)
@@ -61,11 +61,11 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
   }
 
   const handleDelete = async () => {
-    if (!confirm(`Удалить сайт "${site.name}"?\n\nБудут удалены файлы и nginx-конфиг. Это действие необратимо.`)) return
-    const removeCert = site.ssl ? confirm('Также удалить SSL-сертификат Let\'s Encrypt?') : false
+    if (!confirm(`Delete site "${site.name}"?\n\nFiles and the nginx config will be removed. This cannot be undone.`)) return
+    const removeCert = site.ssl ? confirm('Also delete the Let\'s Encrypt SSL certificate?') : false
     const res = await deleteSite(site.slug, removeCert)
     if (res.success) onAction()
-    else alert(res.error || 'Не удалось удалить')
+    else alert(res.error || 'Failed to delete')
   }
 
   return (
@@ -88,7 +88,7 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
                     <Globe className="w-3 h-3" /> {site.domain}
                   </a>
                 ) : (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-text-muted/10 text-text-muted">домен не подключён</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-text-muted/10 text-text-muted">no domain connected</span>
                 )}
                 {site.http && (
                   httpOk
@@ -112,12 +112,12 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
               <div className="flex items-center gap-1.5"><Files className="w-3.5 h-3.5 text-text-muted" /><span className="font-mono text-sm text-text-secondary">{site.fileCount}</span></div>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => setFilesOpen(true)} className="p-1.5 rounded-lg hover:bg-accent-blue/10 text-text-muted hover:text-accent-blue transition-colors" title="Файлы"><FolderTree className="w-4 h-4" /></button>
-              <button onClick={() => fileRef.current?.click()} className="p-1.5 rounded-lg hover:bg-accent-purple/10 text-text-muted hover:text-accent-purple transition-colors" title="Перезалить zip"><FileArchive className="w-4 h-4" /></button>
+              <button onClick={() => setFilesOpen(true)} className="p-1.5 rounded-lg hover:bg-accent-blue/10 text-text-muted hover:text-accent-blue transition-colors" title="Files"><FolderTree className="w-4 h-4" /></button>
+              <button onClick={() => fileRef.current?.click()} className="p-1.5 rounded-lg hover:bg-accent-purple/10 text-text-muted hover:text-accent-purple transition-colors" title="Re-upload zip"><FileArchive className="w-4 h-4" /></button>
               {site.domain && (
-                <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-accent-cyan/10 text-text-muted hover:text-accent-cyan transition-colors" title="Открыть сайт"><ExternalLink className="w-4 h-4" /></a>
+                <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-accent-cyan/10 text-text-muted hover:text-accent-cyan transition-colors" title="Open site"><ExternalLink className="w-4 h-4" /></a>
               )}
-              <button onClick={handleDelete} className="p-1.5 rounded-lg hover:bg-accent-red/10 text-text-muted hover:text-accent-red transition-colors" title="Удалить сайт"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={handleDelete} className="p-1.5 rounded-lg hover:bg-accent-red/10 text-text-muted hover:text-accent-red transition-colors" title="Delete site"><Trash2 className="w-4 h-4" /></button>
               <button onClick={() => setExpanded(!expanded)} className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted transition-colors">
                 {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
@@ -127,7 +127,7 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
 
         <div className="flex md:hidden items-center gap-4 mt-2 text-xs">
           <span className="font-mono text-text-secondary flex items-center gap-1"><HardDrive className="w-3 h-3" /> {site.diskUsage}</span>
-          <span className="font-mono text-text-secondary flex items-center gap-1"><Files className="w-3 h-3" /> {site.fileCount} файлов</span>
+          <span className="font-mono text-text-secondary flex items-center gap-1"><Files className="w-3 h-3" /> {site.fileCount} files</span>
         </div>
       </div>
 
@@ -137,38 +137,38 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Globe className="w-4 h-4 text-accent-cyan" />
-              <span className="text-sm font-semibold text-text-primary">Домен и SSL</span>
+              <span className="text-sm font-semibold text-text-primary">Domain &amp; SSL</span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="example.cz"
+              <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="example.com"
                 className="flex-1 bg-bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm font-mono text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50" />
               <label className="flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer shrink-0">
                 <input type="checkbox" checked={www} onChange={e => setWww(e.target.checked)} className="accent-accent-blue w-4 h-4" /> www
               </label>
               <button onClick={handleDomain} disabled={domainBusy || !domain.trim()} className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50 shrink-0">
                 {domainBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                {site.ssl ? 'Обновить SSL' : 'Подключить'}
+                {site.ssl ? 'Renew SSL' : 'Connect'}
               </button>
             </div>
-            {domainBusy && <p className="text-xs text-text-muted mt-2 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Настройка… (до минуты)</p>}
+            {domainBusy && <p className="text-xs text-text-muted mt-2 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Setting up… (up to a minute)</p>}
             {domainResult && <div className="mt-3"><StepLog result={domainResult} /></div>}
           </div>
 
           {/* Re-upload progress */}
           {(progress !== null || uploadResult) && (
             <div>
-              <div className="flex items-center gap-2 mb-2"><FileArchive className="w-4 h-4 text-accent-purple" /><span className="text-sm font-semibold text-text-primary">Перезагрузка файлов</span></div>
+              <div className="flex items-center gap-2 mb-2"><FileArchive className="w-4 h-4 text-accent-purple" /><span className="text-sm font-semibold text-text-primary">Re-uploading files</span></div>
               {progress !== null && (
                 <div>
                   <div className="h-2 bg-bg-secondary rounded-full overflow-hidden"><div className="h-full bg-accent-purple transition-all" style={{ width: `${progress}%` }} /></div>
-                  <p className="text-xs text-text-muted mt-1">{progress < 100 ? `Загрузка ${progress}%` : 'Распаковка…'}</p>
+                  <p className="text-xs text-text-muted mt-1">{progress < 100 ? `Uploading ${progress}%` : 'Extracting…'}</p>
                 </div>
               )}
               {uploadResult && <StepLog result={uploadResult} />}
             </div>
           )}
 
-          <p className="text-xs text-text-muted">Создан: {new Date(site.createdAt).toLocaleDateString('cs-CZ')} · /opt/static-sites/{site.slug}</p>
+          <p className="text-xs text-text-muted">Created: {new Date(site.createdAt).toLocaleDateString('en-GB')} · /opt/static-sites/{site.slug}</p>
         </div>
       )}
 
