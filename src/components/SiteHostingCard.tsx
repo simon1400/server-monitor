@@ -6,6 +6,7 @@ import {
 import type { ManagedSite, StepResult } from '../types/hosting'
 import { uploadZip, setupDomain, deleteSite } from '../hooks/useHosting'
 import FileManagerModal from './FileManagerModal'
+import DeleteSiteModal from './DeleteSiteModal'
 
 function StepLog({ result }: { result: StepResult }) {
   return (
@@ -27,6 +28,7 @@ function StepLog({ result }: { result: StepResult }) {
 export default function SiteHostingCard({ site, onAction }: { site: ManagedSite; onAction: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [filesOpen, setFilesOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [uploadResult, setUploadResult] = useState<StepResult | null>(null)
   const [domain, setDomain] = useState(site.domain)
@@ -61,11 +63,9 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
     if (res.success) setTimeout(onAction, 1500)
   }
 
-  const handleDelete = async () => {
-    if (!confirm(`Delete site "${site.name}"?\n\nFiles and the nginx config will be removed. This cannot be undone.`)) return
-    const removeCert = site.ssl ? confirm('Also delete the Let\'s Encrypt SSL certificate?') : false
+  const handleDelete = async (removeCert: boolean) => {
     const res = await deleteSite(site.slug, removeCert)
-    if (res.success) onAction()
+    if (res.success) { setDeleteOpen(false); onAction() }
     else alert(res.error || 'Failed to delete')
   }
 
@@ -118,7 +118,7 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
               {site.domain && (
                 <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-accent-cyan/10 text-text-muted hover:text-accent-cyan transition-colors" title="Open site"><ExternalLink className="w-4 h-4" /></a>
               )}
-              <button onClick={handleDelete} className="p-1.5 rounded-lg hover:bg-accent-red/10 text-text-muted hover:text-accent-red transition-colors" title="Delete site"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => setDeleteOpen(true)} className="p-1.5 rounded-lg hover:bg-accent-red/10 text-text-muted hover:text-accent-red transition-colors" title="Delete site"><Trash2 className="w-4 h-4" /></button>
               <button onClick={() => setExpanded(!expanded)} className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted transition-colors">
                 {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
@@ -180,6 +180,7 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
       )}
 
       {filesOpen && <FileManagerModal slug={site.slug} siteName={site.name} onClose={() => { setFilesOpen(false); onAction() }} />}
+      {deleteOpen && <DeleteSiteModal site={site} onCancel={() => setDeleteOpen(false)} onConfirm={handleDelete} />}
     </div>
   )
 }
