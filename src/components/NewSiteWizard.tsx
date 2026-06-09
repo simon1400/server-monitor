@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Loader2, CheckCircle, XCircle, Globe, FileArchive, ArrowRight, ArrowLeft, PartyPopper, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { X, Loader2, CheckCircle, XCircle, Globe, FileArchive, ArrowRight, ArrowLeft, PartyPopper, ShieldCheck, AlertTriangle, Wallet } from 'lucide-react'
 import { createSite, uploadZip, setupDomain } from '../hooks/useHosting'
 import type { StepResult } from '../types/hosting'
 import panicMeme from '../assets/panic-www.png'
@@ -8,6 +8,8 @@ interface Props {
   onClose: () => void
   onDone: () => void
 }
+
+const CURRENCIES = ['CZK', 'EUR', 'USD']
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -56,6 +58,10 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
   const [www, setWww] = useState(true)
   const [redirectWww, setRedirectWww] = useState(true)
   const [dnsAck, setDnsAck] = useState(false)
+  // Billing (mandatory)
+  const [cost, setCost] = useState('')
+  const [currency, setCurrency] = useState('CZK')
+  const [nextPaymentDate, setNextPaymentDate] = useState('')
   const [slug, setSlug] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,25 +77,37 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
   }
   const onNameChange = (v: string) => {
     setName(v)
-    setNameEdited(v.trim().length > 0) // empty again → resume auto-fill from domain
+    setNameEdited(v.trim().length > 0)
   }
 
-  const createAndNext = async () => {
+  const billingValid = cost.trim() !== '' && !isNaN(Number(cost)) && Number(cost) >= 0 && nextPaymentDate.trim() !== ''
+
+  // Step 1 → 2
+  const goBilling = () => {
     setError(null)
     if (!name.trim()) { setError('Enter a site name'); return }
-    if (slug) { setStep(2); return } // already created — just move on
+    setStep(2)
+  }
+
+  // Step 2 → create site → 3
+  const createAndNext = async () => {
+    setError(null)
+    if (!billingValid) { setError('Enter the hosting cost and the next payment date'); return }
+    if (slug) { setStep(3); return } // already created
     setBusy(true)
-    const res = await createSite(name.trim(), domain.trim())
+    const res = await createSite(name.trim(), domain.trim(), {
+      hostingCost: Number(cost), hostingCurrency: currency, nextPaymentDate,
+    })
     setBusy(false)
     if (!res.success || !res.slug) { setError(res.error || 'Failed to create site'); return }
     setSlug(res.slug)
-    setStep(2)
+    setStep(3)
   }
 
   // After Files: go to Confirm if a domain was set, otherwise finish.
   const proceedAfterFiles = () => {
     setError(null)
-    setStep(domain.trim() ? 3 : 4)
+    setStep(domain.trim() ? 4 : 5)
   }
 
   const doUpload = async () => {
@@ -111,7 +129,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
     const res = await setupDomain(slug, domain.trim(), www, redirectWww)
     setDomainResult(res)
     setBusy(false)
-    if (res.success) setTimeout(() => setStep(4), 700)
+    if (res.success) setTimeout(() => setStep(5), 700)
   }
 
   const onDrop = (e: React.DragEvent) => {
@@ -121,7 +139,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
     if (f) setFile(f)
   }
 
-  const steps = ['Site', 'Files', 'Confirm', 'Done']
+  const steps = ['Site', 'Billing', 'Files', 'Confirm', 'Done']
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -158,7 +176,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
             <div className="text-sm text-accent-red bg-accent-red/10 rounded-lg px-3 py-2 mb-3">{error}</div>
           )}
 
-          {/* Step 1 — Site (domain first, then name + domain options) */}
+          {/* Step 1 — Site */}
           {step === 1 && (
             <div className="space-y-4">
               <div>
@@ -194,14 +212,56 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
                       Redirect <span className="font-mono text-text-primary">www</span> → <span className="font-mono text-text-primary">{domain.trim()}</span>
                     </label>
                   )}
-                  {www && <p className="text-xs text-text-muted">Requires that <span className="font-mono">www.*</span> also points (A-record) to this server.</p>}
                 </div>
               )}
             </div>
           )}
 
-          {/* Step 2 — Files */}
+          {/* Step 2 — Billing (mandatory) */}
           {step === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                <Wallet className="w-4 h-4 text-accent-cyan" />
+                Hosting billing — <span className="text-text-muted">required</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-sm text-text-secondary block mb-1.5">Cost per period</label>
+                  <input
+                    autoFocus
+                    type="number" min="0" step="0.01" inputMode="decimal"
+                    value={cost}
+                    onChange={e => setCost(e.target.value)}
+                    placeholder="0"
+                    className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50"
+                  />
+                </div>
+                <div className="w-28 shrink-0">
+                  <label className="text-sm text-text-secondary block mb-1.5">Currency</label>
+                  <select
+                    value={currency}
+                    onChange={e => setCurrency(e.target.value)}
+                    className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-blue/50"
+                  >
+                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-text-secondary block mb-1.5">Next payment date</label>
+                <input
+                  type="date"
+                  value={nextPaymentDate}
+                  onChange={e => setNextPaymentDate(e.target.value)}
+                  className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-blue/50 [color-scheme:dark]"
+                />
+              </div>
+              <p className="text-xs text-text-muted">You can change these later from the site card — every change is logged.</p>
+            </div>
+          )}
+
+          {/* Step 3 — Files */}
+          {step === 3 && (
             <div className="space-y-3">
               <p className="text-sm text-text-secondary">Upload a .zip with the site files (it must contain <span className="font-mono text-text-primary">index.html</span>).</p>
               <label
@@ -230,8 +290,8 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* Step 3 — Confirm */}
-          {step === 3 && (
+          {/* Step 4 — Confirm */}
+          {step === 4 && (
             <div className="space-y-4">
               <img src={panicMeme} alt="" className="w-full max-w-[280px] mx-auto rounded-xl border border-border shadow-lg" />
 
@@ -260,15 +320,15 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* Step 4 — Done */}
-          {step === 4 && (
+          {/* Step 5 — Done */}
+          {step === 5 && (
             <div className="flex flex-col items-center text-center py-6 gap-3">
               <PartyPopper className="w-12 h-12 text-accent-green" />
               <h3 className="text-lg font-semibold text-text-primary">{domain ? 'Site published!' : 'Site created!'}</h3>
               {domain
                 ? <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline flex items-center gap-1 font-mono"><Globe className="w-4 h-4" /> https://{domain}</a>
                 : <p className="text-sm text-text-muted">You can connect a domain later from the site card.</p>}
-              <p className="text-sm text-text-muted">You can edit files from the site card anytime.</p>
+              <p className="text-sm text-text-muted">You can edit files and billing from the site card anytime.</p>
             </div>
           )}
         </div>
@@ -276,32 +336,40 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
         {/* Footer */}
         <div className="border-t border-border p-4 shrink-0 flex items-center justify-between">
           <button onClick={onClose} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors">
-            {step === 4 ? 'Close' : 'Cancel'}
+            {step === 5 ? 'Close' : 'Cancel'}
           </button>
           <div className="flex items-center gap-2">
             {step === 1 && (
-              <button onClick={createAndNext} disabled={busy} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Next
+              <button onClick={goBilling} disabled={busy} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
+                <ArrowRight className="w-4 h-4" /> Next
               </button>
             )}
             {step === 2 && (
               <>
-                <button onClick={() => setStep(1)} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"><ArrowLeft className="w-4 h-4" /> Back</button>
+                <button onClick={() => setStep(1)} disabled={busy} className="flex items-center gap-1.5 px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"><ArrowLeft className="w-4 h-4" /> Back</button>
+                <button onClick={createAndNext} disabled={busy || !billingValid} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Next
+                </button>
+              </>
+            )}
+            {step === 3 && (
+              <>
+                <button onClick={() => setStep(2)} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"><ArrowLeft className="w-4 h-4" /> Back</button>
                 <button onClick={proceedAfterFiles} disabled={busy} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Skip</button>
                 <button onClick={doUpload} disabled={busy || !file} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Upload
                 </button>
               </>
             )}
-            {step === 3 && (
+            {step === 4 && (
               <>
-                <button onClick={() => { setStep(2); setDomainResult(null) }} disabled={busy} className="flex items-center gap-1.5 px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"><ArrowLeft className="w-4 h-4" /> Back</button>
+                <button onClick={() => { setStep(3); setDomainResult(null) }} disabled={busy} className="flex items-center gap-1.5 px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"><ArrowLeft className="w-4 h-4" /> Back</button>
                 <button onClick={doDomain} disabled={busy || !dnsAck} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Publish
                 </button>
               </>
             )}
-            {step === 4 && (
+            {step === 5 && (
               <button onClick={onDone} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-green hover:bg-accent-green/90 text-white rounded-lg transition-colors">
                 <CheckCircle className="w-4 h-4" /> Done
               </button>

@@ -12,7 +12,7 @@ import { deployProcess } from './deploy.js'
 import { getProcessEnv, saveProcessEnv } from './env.js'
 import { authMiddleware, login, logout, checkAuth } from './auth.js'
 import {
-  listManagedSites, createSite, uploadZip, setupDomain, deleteSite,
+  listManagedSites, createSite, updateSiteAdmin, uploadZip, setupDomain, deleteSite,
   listTree, readTextFile, writeTextFile, makeDir, renameEntry, deleteEntry,
   saveUploadedFiles, getDownload,
 } from './hosting.js'
@@ -232,12 +232,22 @@ app.get('/api/hosting/sites', async (_req, res) => {
 
 app.post('/api/hosting/sites', async (req, res) => {
   try {
-    const { name, domain } = req.body
-    const result = await createSite(name, domain)
+    const { name, domain, hostingCost, hostingCurrency, nextPaymentDate } = req.body
+    const result = await createSite(name, domain, { hostingCost, hostingCurrency, nextPaymentDate })
     if (!result.success) { res.status(400).json(result); return }
     res.json(result)
   } catch {
     res.status(500).json({ success: false, error: 'Failed to create site' })
+  }
+})
+
+app.patch('/api/hosting/sites/:slug/admin', async (req, res) => {
+  try {
+    const result = await updateSiteAdmin(String(req.params.slug), req.body || {})
+    if (!result.success) { res.status(400).json(result); return }
+    res.json(result)
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to update admin info' })
   }
 })
 

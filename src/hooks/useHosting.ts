@@ -30,12 +30,31 @@ export function useHostingSites(interval = 15000) {
   return { sites, loading, error, refresh }
 }
 
-export async function createSite(name: string, domain: string): Promise<{ success: boolean; slug?: string; error?: string }> {
+export interface AdminInfo {
+  hostingCost?: number | null
+  hostingCurrency?: string | null
+  nextPaymentDate?: string | null
+}
+
+export async function createSite(name: string, domain: string, admin?: AdminInfo): Promise<{ success: boolean; slug?: string; error?: string }> {
   try {
     const res = await fetch(`${API}/sites`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, domain }),
+      body: JSON.stringify({ name, domain, ...admin }),
+    })
+    return await res.json()
+  } catch {
+    return { success: false, error: 'Network error' }
+  }
+}
+
+export async function updateSiteAdmin(slug: string, patch: AdminInfo & { name?: string }): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API}/sites/${slug}/admin`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
     })
     return await res.json()
   } catch {

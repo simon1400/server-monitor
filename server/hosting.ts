@@ -20,6 +20,13 @@ const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/
 const DOMAIN_RE = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/i
 
 // ── Types ─────────────────────────────────────────────────────────────────
+export interface HistoryEntry {
+  at: string            // ISO timestamp
+  field: string         // 'created' | 'name' | 'cost' | 'currency' | 'nextPayment'
+  from: string | null
+  to: string | null
+}
+
 export interface SiteMeta {
   slug: string
   name: string
@@ -28,6 +35,18 @@ export interface SiteMeta {
   redirectWww?: boolean
   ssl: boolean
   createdAt: string
+  // Administrative / billing info
+  hostingCost?: number
+  hostingCurrency?: string
+  nextPaymentDate?: string   // YYYY-MM-DD
+  history?: HistoryEntry[]
+}
+
+export interface AdminPatch {
+  name?: string
+  hostingCost?: number | null
+  hostingCurrency?: string | null
+  nextPaymentDate?: string | null
 }
 
 export interface ManagedSite extends SiteMeta {
@@ -180,7 +199,11 @@ export async function listManagedSites(): Promise<ManagedSite[]> {
   }))
 }
 
-export async function createSite(name: string, domain: string): Promise<{ success: boolean; slug?: string; error?: string }> {
+export async function createSite(
+  name: string,
+  domain: string,
+  admin?: { hostingCost?: number | null; hostingCurrency?: string | null; nextPaymentDate?: string | null },
+): Promise<{ success: boolean; slug?: string; error?: string }> {
   const cleanName = String(name || '').trim()
   const cleanDomain = String(domain || '').trim().toLowerCase()
   if (!cleanName) return { success: false, error: 'Name is required' }
@@ -201,9 +224,60 @@ export async function createSite(name: string, domain: string): Promise<{ succes
 
   await fs.mkdir(siteRootOf(slug), { recursive: true })
   await execCmd(`chown root:root ${siteRootOf(slug)}`)
-  sites.push({ slug, name: cleanName, domain: cleanDomain, www: false, ssl: false, createdAt: new Date().toISOString() })
+
+  const now = new Date().toISOString()
+  const cost = admin?.hostingCost ?? undefined
+  const currency = admin?.hostingCurrency || undefined
+  const nextPaymentDate = admin?.nextPaymentDate || undefined
+  const history: HistoryEntry[] = [{ at: now, field: 'created', from: null, to: cleanName }]
+  if (cost != null) history.push({ at: now, field: 'cost', from: null, to: `${cost}${currency ? ' ' + currency : ''}` })
+  if (nextPaymentDate) history.push({ at: now, field: 'nextPayment', from: null, to: nextPaymentDate })
+
+  sites.push({
+    slug, name: cleanName, domain: cleanDomain, www: false, ssl: false, createdAt: now,
+    hostingCost: cost, hostingCurrency: currency, nextPaymentDate, history,
+  })
   await writeRegistry(sites)
   return { success: true, slug }
+}
+
+// Update administrative info, recording a change-log entry per changed field.
+export async function updateSiteAdmin(slug: string, patch: AdminPatch): Promise<{ success: boolean; error?: string; site?: SiteMeta }> {
+  const sites = await readRegistry()
+  const idx = sites.findIndex(s => s.slug === slug)
+  if (idx === -1) return { success: false, error: 'Site not found' }
+
+  const cur = { ...sites[idx] }
+  const now = new Date().toISOString()
+  const history: HistoryEntry[] = cur.history ? [...cur.history] : []
+  const norm = (v: unknown) => (v == null || v === '' ? null : String(v))
+  const track = (field: string, oldV: unknown, newV: unknown) => {
+    const a = norm(oldV), b = norm(newV)
+    if (a !== b) { history.push({ at: now, field, from: a, to: b }); return true }
+    return false
+  }
+
+  if (patch.name !== undefined) {
+    const nm = String(patch.name).trim()
+    if (nm && track('name', cur.name, nm)) cur.name = nm
+  }
+  if (patch.hostingCurrency !== undefined) {
+    const cc = patch.hostingCurrency || undefined
+    if (track('currency', cur.hostingCurrency, cc)) cur.hostingCurrency = cc
+  }
+  if (patch.hostingCost !== undefined) {
+    const cost = patch.hostingCost == null ? undefined : Number(patch.hostingCost)
+    if (track('cost', cur.hostingCost, cost)) cur.hostingCost = cost
+  }
+  if (patch.nextPaymentDate !== undefined) {
+    const d = patch.nextPaymentDate || undefined
+    if (track('nextPayment', cur.nextPaymentDate, d)) cur.nextPaymentDate = d
+  }
+
+  cur.history = history
+  sites[idx] = cur
+  await writeRegistry(sites)
+  return { success: true, site: cur }
 }
 
 // Move contents up one level if the archive was wrapped in a single folder.

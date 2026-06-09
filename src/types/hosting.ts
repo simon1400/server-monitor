@@ -1,3 +1,10 @@
+export interface HistoryEntry {
+  at: string
+  field: string
+  from: string | null
+  to: string | null
+}
+
 export interface ManagedSite {
   slug: string
   name: string
@@ -6,6 +13,10 @@ export interface ManagedSite {
   redirectWww?: boolean
   ssl: boolean
   createdAt: string
+  hostingCost?: number
+  hostingCurrency?: string
+  nextPaymentDate?: string
+  history?: HistoryEntry[]
   exists: boolean
   diskUsage: string
   fileCount: number

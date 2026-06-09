@@ -2,11 +2,26 @@ import { useState, useRef } from 'react'
 import {
   Globe, ExternalLink, FolderTree, FileArchive, ShieldCheck, ShieldAlert, ShieldX,
   HardDrive, Files, Trash2, ChevronDown, ChevronUp, Loader2, CheckCircle, XCircle, AlertTriangle,
+  Wallet, CalendarClock, History, Save,
 } from 'lucide-react'
 import type { ManagedSite, StepResult } from '../types/hosting'
-import { uploadZip, setupDomain, deleteSite } from '../hooks/useHosting'
+import { uploadZip, setupDomain, deleteSite, updateSiteAdmin } from '../hooks/useHosting'
 import FileManagerModal from './FileManagerModal'
 import DeleteSiteModal from './DeleteSiteModal'
+
+const CURRENCIES = ['CZK', 'EUR', 'USD']
+
+function daysUntil(dateStr?: string): number | null {
+  if (!dateStr) return null
+  const d = new Date(dateStr + 'T00:00:00')
+  if (isNaN(d.getTime())) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  return Math.round((d.getTime() - today.getTime()) / 86400000)
+}
+
+function fieldLabel(f: string): string {
+  return ({ created: 'created', name: 'name', cost: 'cost', currency: 'currency', nextPayment: 'next payment' } as Record<string, string>)[f] || f
+}
 
 function StepLog({ result }: { result: StepResult }) {
   return (
@@ -37,6 +52,32 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
   const [domainBusy, setDomainBusy] = useState(false)
   const [domainResult, setDomainResult] = useState<StepResult | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Billing edit state
+  const [cost, setCost] = useState(site.hostingCost != null ? String(site.hostingCost) : '')
+  const [currency, setCurrency] = useState(site.hostingCurrency || 'CZK')
+  const [nextPaymentDate, setNextPaymentDate] = useState(site.nextPaymentDate || '')
+  const [billingSaving, setBillingSaving] = useState(false)
+  const [billingSaved, setBillingSaved] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+
+  const billingChanged =
+    cost !== (site.hostingCost != null ? String(site.hostingCost) : '') ||
+    currency !== (site.hostingCurrency || 'CZK') ||
+    nextPaymentDate !== (site.nextPaymentDate || '')
+
+  const handleSaveBilling = async () => {
+    if (cost.trim() !== '' && isNaN(Number(cost))) return
+    setBillingSaving(true)
+    setBillingSaved(false)
+    const res = await updateSiteAdmin(site.slug, {
+      hostingCost: cost.trim() === '' ? null : Number(cost),
+      hostingCurrency: currency,
+      nextPaymentDate: nextPaymentDate || null,
+    })
+    setBillingSaving(false)
+    if (res.success) { setBillingSaved(true); setTimeout(() => setBillingSaved(false), 2000); onAction() }
+  }
 
   const httpOk = site.http?.ok ?? null
   const isProblematic = (site.domain && httpOk === false) || (site.sslInfo && !site.sslInfo.valid)
@@ -103,6 +144,11 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
                       ? <span className="flex items-center gap-1 text-xs text-accent-yellow font-medium"><ShieldAlert className="w-3 h-3" /> {site.sslInfo.daysLeft}d</span>
                       : <span className="flex items-center gap-1 text-xs text-accent-green"><ShieldCheck className="w-3 h-3" /> {site.sslInfo.daysLeft}d</span>)
                   : site.domain && <span className="flex items-center gap-1 text-xs text-text-muted"><ShieldX className="w-3 h-3" /> No SSL</span>}
+                {site.nextPaymentDate && (() => {
+                  const d = daysUntil(site.nextPaymentDate)
+                  const cls = d == null ? 'text-text-muted' : d < 0 ? 'text-accent-red font-medium' : d <= 7 ? 'text-accent-yellow font-medium' : 'text-text-muted'
+                  return <span className={`flex items-center gap-1 text-xs ${cls}`} title="Next hosting payment"><CalendarClock className="w-3 h-3" /> {site.nextPaymentDate}{d != null && d < 0 ? ' (overdue)' : d != null && d <= 7 ? ` (${d}d)` : ''}</span>
+                })()}
               </div>
             </div>
           </div>
@@ -172,6 +218,61 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
                 </div>
               )}
               {uploadResult && <StepLog result={uploadResult} />}
+            </div>
+          )}
+
+          {/* Billing */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet className="w-4 h-4 text-accent-cyan" />
+              <span className="text-sm font-semibold text-text-primary">Billing</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-text-muted block mb-1">Cost</label>
+                <input type="number" min="0" step="0.01" inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} placeholder="0"
+                  className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-blue/50" />
+              </div>
+              <div className="w-24 shrink-0">
+                <label className="text-xs text-text-muted block mb-1">Currency</label>
+                <select value={currency} onChange={e => setCurrency(e.target.value)}
+                  className="w-full bg-bg-secondary border border-border rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue/50">
+                  {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-text-muted block mb-1">Next payment</label>
+                <input type="date" value={nextPaymentDate} onChange={e => setNextPaymentDate(e.target.value)}
+                  className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue/50 [color-scheme:dark]" />
+              </div>
+              <button onClick={handleSaveBilling} disabled={billingSaving || !billingChanged || (cost.trim() !== '' && isNaN(Number(cost)))}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50 shrink-0">
+                {billingSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+              </button>
+            </div>
+            {billingSaved && <p className="text-xs text-accent-green mt-1.5">Saved ✓</p>}
+          </div>
+
+          {/* Change history */}
+          {site.history && site.history.length > 0 && (
+            <div>
+              <button onClick={() => setShowHistory(!showHistory)} className="flex items-center gap-2 text-sm font-semibold text-text-primary hover:text-accent-blue transition-colors">
+                <History className="w-4 h-4 text-text-muted" /> Change history ({site.history.length})
+                {showHistory ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              {showHistory && (
+                <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
+                  {[...site.history].reverse().map((h, i) => (
+                    <div key={i} className="text-xs flex flex-wrap items-baseline gap-x-2 gap-y-0.5 bg-bg-secondary/40 rounded px-2 py-1.5">
+                      <span className="text-text-muted shrink-0 font-mono">{new Date(h.at).toLocaleString('en-GB')}</span>
+                      <span className="text-text-secondary">
+                        <span className="text-text-primary font-medium">{fieldLabel(h.field)}</span>
+                        {h.field !== 'created' && <>: {h.from ?? '—'} → <span className="text-text-primary">{h.to ?? '—'}</span></>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
