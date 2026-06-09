@@ -429,6 +429,27 @@ ${serve}
 `
 }
 
+// Detect if the domain (or www) is already served by a DIFFERENT nginx config
+// (not this site's own static-<slug>). Prevents clobbering an unrelated site.
+async function findDomainConflict(slug: string, domain: string, www: boolean): Promise<string | null> {
+  const names = new Set([domain.toLowerCase(), ...(www ? [`www.${domain.toLowerCase()}`] : [])])
+  const ownName = `static-${slug}`
+  let files: string[]
+  try { files = await fs.readdir(NGINX_ENABLED) } catch { return null }
+  for (const f of files) {
+    if (f === ownName) continue
+    let content: string
+    try { content = await fs.readFile(path.join(NGINX_ENABLED, f), 'utf-8') } catch { continue }
+    const re = /server_name\s+([^;]+);/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(content))) {
+      const tokens = m[1].trim().toLowerCase().split(/\s+/)
+      if (tokens.some(t => names.has(t))) return f
+    }
+  }
+  return null
+}
+
 export async function setupDomain(slug: string, domainInput: string, wantWww: boolean, redirectWww: boolean): Promise<StepResult> {
   const steps: StepResult['steps'] = []
   const meta = await getMeta(slug)
@@ -469,6 +490,16 @@ export async function setupDomain(slug: string, domainInput: string, wantWww: bo
     }
   }
   steps.push({ name: 'dns', success: true, output: `${domain}${www ? ` + www.${domain}` : ''} → ${apexIps.join(', ')}${serverIp ? ` ✓ matches server (${serverIp})` : ''}` })
+
+  // Conflict guard: refuse if another nginx config already serves this domain
+  const conflict = await findDomainConflict(slug, domain, www)
+  if (conflict) {
+    return {
+      steps: [...steps, { name: 'conflict check', success: false, output: `Already served by nginx config "${conflict}"` }],
+      success: false,
+      error: `The domain ${domain} is already served by another nginx config on this server ("${conflict}") that is NOT managed by this tool. Publishing here would conflict with it (and could affect its SSL). Remove/rename that config first, or use a different domain.`,
+    }
+  }
 
   const availPath = path.join(NGINX_AVAILABLE, `static-${slug}`)
   const enabledPath = path.join(NGINX_ENABLED, `static-${slug}`)

@@ -56,10 +56,17 @@ export default function DeleteSiteModal({ site, onCancel, onConfirm }: Props) {
               <FileX className="w-4 h-4 text-accent-red shrink-0 mt-0.5" />
               <span>All files in <span className="font-mono text-xs text-text-primary">/opt/static-sites/{site.slug}</span> ({site.fileCount} files, {site.diskUsage}) and the backup will be erased.</span>
             </div>
-            <div className="flex items-start gap-2 text-text-secondary">
-              <Globe className="w-4 h-4 text-accent-yellow shrink-0 mt-0.5" />
-              <span>The nginx config is removed — {site.domain ? <span className="font-mono text-xs text-text-primary">{site.domain}</span> : 'the domain'} will stop responding.</span>
-            </div>
+            {site.hasNginx ? (
+              <div className="flex items-start gap-2 text-text-secondary">
+                <Globe className="w-4 h-4 text-accent-yellow shrink-0 mt-0.5" />
+                <span>Its nginx config (<span className="font-mono text-xs text-text-primary">static-{site.slug}</span>) is removed — {site.domain ? <span className="font-mono text-xs text-text-primary">{site.domain}</span> : 'the domain'} will stop responding.</span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 text-accent-green">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>This site was never published — <span className="text-text-secondary">no nginx or SSL changes are made</span>. Only its files are removed; any other site on {site.domain ? <span className="font-mono text-xs text-text-primary">{site.domain}</span> : 'that domain'} is untouched.</span>
+              </div>
+            )}
             <div className="flex items-start gap-2 text-text-muted">
               <Info className="w-4 h-4 shrink-0 mt-0.5" />
               <span>The DNS A-record is <span className="text-text-secondary">not</span> changed — manage it at your registrar.</span>
