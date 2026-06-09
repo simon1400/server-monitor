@@ -39,7 +39,7 @@ export async function getNginxDomains(): Promise<string[]> {
   }
 }
 
-function checkHttp(domain: string): Promise<{ status: number | null; time: number; error: string | null }> {
+export function checkHttp(domain: string): Promise<{ status: number | null; time: number; error: string | null }> {
   return new Promise((resolve) => {
     const start = Date.now()
     const path = CUSTOM_CHECK_PATHS[domain] || '/'
@@ -76,7 +76,7 @@ function checkHttp(domain: string): Promise<{ status: number | null; time: numbe
   })
 }
 
-function checkSSL(domain: string): Promise<SiteStatus['ssl']> {
+export function checkSSL(domain: string): Promise<SiteStatus['ssl']> {
   return new Promise((resolve) => {
     const socket = tls.connect(
       443,

@@ -1,6 +1,8 @@
 import { readFileSync } from 'fs'
+import os from 'os'
 import express from 'express'
 import cors from 'cors'
+import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getPM2Processes, getPM2Logs, restartProcess, stopProcess, resetProcessRestarts } from './pm2.js'
@@ -9,6 +11,11 @@ import { checkAllSites, getStaticSites, getDiskUsage, getProcessHttpStatus } fro
 import { deployProcess } from './deploy.js'
 import { getProcessEnv, saveProcessEnv } from './env.js'
 import { authMiddleware, login, logout, checkAuth } from './auth.js'
+import {
+  listManagedSites, createSite, uploadZip, setupDomain, deleteSite,
+  listTree, readTextFile, writeTextFile, makeDir, renameEntry, deleteEntry,
+  saveUploadedFiles, getDownload,
+} from './hosting.js'
 import { initVapid, getVapidPublicKey, addPushSubscription, removePushSubscription, getNotificationStatus } from './notifications.js'
 import { startAlerting, getAlertStates } from './alerting.js'
 
@@ -31,8 +38,11 @@ try {
 const app = express()
 const PORT = process.env.PORT || 4400
 
+// Multipart upload (zip & individual files) → temp dir, generous size cap
+const upload = multer({ dest: os.tmpdir(), limits: { fileSize: 350 * 1024 * 1024 } })
+
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '5mb' }))
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
@@ -206,6 +216,143 @@ app.get('/api/disk-usage', async (_req, res) => {
     res.json(usage)
   } catch {
     res.status(500).json({ error: 'Failed to fetch disk usage' })
+  }
+})
+
+
+// --- Hosting (self-service static sites) ---
+
+app.get('/api/hosting/sites', async (_req, res) => {
+  try {
+    res.json(await listManagedSites())
+  } catch {
+    res.status(500).json({ error: 'Failed to list sites' })
+  }
+})
+
+app.post('/api/hosting/sites', async (req, res) => {
+  try {
+    const { name, domain } = req.body
+    const result = await createSite(name, domain)
+    if (!result.success) { res.status(400).json(result); return }
+    res.json(result)
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to create site' })
+  }
+})
+
+app.post('/api/hosting/sites/:slug/upload', upload.single('file'), async (req, res) => {
+  req.setTimeout(600000)
+  res.setTimeout(600000)
+  if (!req.file) { res.status(400).json({ success: false, error: 'No file uploaded' }); return }
+  try {
+    const mode = req.query.mode === 'merge' ? 'merge' : 'replace'
+    const result = await uploadZip(String(req.params.slug), req.file.path, mode)
+    res.json(result)
+  } catch (e: any) {
+    res.status(500).json({ success: false, steps: [], error: e?.message || 'Upload failed' })
+  } finally {
+    if (req.file) await import('fs').then(fs => fs.promises.unlink(req.file!.path).catch(() => {}))
+  }
+})
+
+app.post('/api/hosting/sites/:slug/domain', async (req, res) => {
+  req.setTimeout(600000)
+  res.setTimeout(600000)
+  try {
+    const { domain, www } = req.body
+    const result = await setupDomain(req.params.slug, domain, www !== false)
+    res.json(result)
+  } catch (e: any) {
+    res.status(500).json({ success: false, steps: [], error: e?.message || 'Domain setup failed' })
+  }
+})
+
+app.delete('/api/hosting/sites/:slug', async (req, res) => {
+  try {
+    const result = await deleteSite(req.params.slug, req.query.removeCert === 'true')
+    if (!result.success) { res.status(400).json(result); return }
+    res.json(result)
+  } catch {
+    res.status(500).json({ success: false, error: 'Failed to delete site' })
+  }
+})
+
+// File manager
+app.get('/api/hosting/sites/:slug/files', async (req, res) => {
+  try {
+    res.json(await listTree(req.params.slug, String(req.query.path || '')))
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message || 'Failed to list files' })
+  }
+})
+
+app.get('/api/hosting/sites/:slug/file', async (req, res) => {
+  try {
+    const p = String(req.query.path || '')
+    if (req.query.download === '1') {
+      const { stream, name, size } = await getDownload(req.params.slug, p)
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(name)}"`)
+      res.setHeader('Content-Length', String(size))
+      stream.pipe(res)
+      return
+    }
+    res.json(await readTextFile(req.params.slug, p))
+  } catch (e: any) {
+    res.status(400).json({ error: e?.message || 'Failed to read file' })
+  }
+})
+
+app.put('/api/hosting/sites/:slug/file', async (req, res) => {
+  try {
+    const { path: p, content } = req.body
+    if (typeof p !== 'string' || typeof content !== 'string') { res.status(400).json({ error: 'Invalid request' }); return }
+    await writeTextFile(req.params.slug, p, content)
+    res.json({ success: true })
+  } catch (e: any) {
+    res.status(400).json({ success: false, error: e?.message || 'Failed to save file' })
+  }
+})
+
+app.post('/api/hosting/sites/:slug/files/upload', upload.array('files'), async (req, res) => {
+  req.setTimeout(600000)
+  res.setTimeout(600000)
+  try {
+    const files = (req.files as Express.Multer.File[] | undefined) || []
+    if (files.length === 0) { res.status(400).json({ success: false, error: 'No files uploaded' }); return }
+    const count = await saveUploadedFiles(String(req.params.slug), String(req.query.path || ''), files)
+    res.json({ success: true, count })
+  } catch (e: any) {
+    res.status(400).json({ success: false, error: e?.message || 'Upload failed' })
+  }
+})
+
+app.post('/api/hosting/sites/:slug/files/mkdir', async (req, res) => {
+  try {
+    await makeDir(req.params.slug, String(req.body.path || ''))
+    res.json({ success: true })
+  } catch (e: any) {
+    res.status(400).json({ success: false, error: e?.message || 'Failed to create folder' })
+  }
+})
+
+app.post('/api/hosting/sites/:slug/files/rename', async (req, res) => {
+  try {
+    const { from, to } = req.body
+    if (typeof from !== 'string' || typeof to !== 'string') { res.status(400).json({ error: 'Invalid request' }); return }
+    await renameEntry(req.params.slug, from, to)
+    res.json({ success: true })
+  } catch (e: any) {
+    res.status(400).json({ success: false, error: e?.message || 'Failed to rename' })
+  }
+})
+
+app.delete('/api/hosting/sites/:slug/files', async (req, res) => {
+  try {
+    await deleteEntry(req.params.slug, String(req.query.path || ''))
+    res.json({ success: true })
+  } catch (e: any) {
+    res.status(400).json({ success: false, error: e?.message || 'Failed to delete' })
   }
 })
 
