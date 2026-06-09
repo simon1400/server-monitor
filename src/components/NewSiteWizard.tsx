@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Loader2, CheckCircle, XCircle, Globe, FileArchive, ArrowRight, PartyPopper } from 'lucide-react'
+import { X, Loader2, CheckCircle, XCircle, Globe, FileArchive, ArrowRight, ArrowLeft, PartyPopper, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { createSite, uploadZip, setupDomain } from '../hooks/useHosting'
 import type { StepResult } from '../types/hosting'
 import panicMeme from '../assets/panic-www.png'
@@ -26,7 +26,7 @@ function StepLog({ result }: { result: StepResult }) {
         </div>
       ))}
       {result.error && (
-        <div className="text-xs text-accent-red bg-accent-red/10 rounded p-2">{result.error}</div>
+        <div className="text-xs text-accent-red bg-accent-red/10 rounded p-2 whitespace-pre-wrap">{result.error}</div>
       )}
     </div>
   )
@@ -38,6 +38,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
   const [domain, setDomain] = useState('')
   const [www, setWww] = useState(true)
   const [redirectWww, setRedirectWww] = useState(true)
+  const [dnsAck, setDnsAck] = useState(false)
   const [slug, setSlug] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,15 +71,21 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
     if (res.success) setTimeout(() => setStep(3), 700)
   }
 
-  const doDomain = async () => {
+  const goConfirm = () => {
+    setError(null)
     if (!domain.trim()) { setError('Enter a domain'); return }
+    setDomainResult(null)
+    setStep(4)
+  }
+
+  const doDomain = async () => {
     setError(null)
     setBusy(true)
     setDomainResult(null)
     const res = await setupDomain(slug, domain.trim(), www, redirectWww)
     setDomainResult(res)
     setBusy(false)
-    if (res.success) setTimeout(() => setStep(4), 700)
+    if (res.success) setTimeout(() => setStep(5), 700)
   }
 
   const onDrop = (e: React.DragEvent) => {
@@ -88,7 +95,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
     if (f) setFile(f)
   }
 
-  const steps = ['Site', 'Files', 'Domain', 'Done']
+  const steps = ['Site', 'Files', 'Domain', 'Confirm', 'Done']
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -125,7 +132,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
             <div className="text-sm text-accent-red bg-accent-red/10 rounded-lg px-3 py-2 mb-3">{error}</div>
           )}
 
-          {/* Step 1 */}
+          {/* Step 1 — Site */}
           {step === 1 && (
             <div className="space-y-4">
               <div>
@@ -151,7 +158,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* Step 2 */}
+          {/* Step 2 — Files */}
           {step === 2 && (
             <div className="space-y-3">
               <p className="text-sm text-text-secondary">Upload a .zip with the site files (it must contain <span className="font-mono text-text-primary">index.html</span>).</p>
@@ -181,10 +188,10 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
             </div>
           )}
 
-          {/* Step 3 */}
+          {/* Step 3 — Domain config */}
           {step === 3 && (
             <div className="space-y-4">
-              <p className="text-sm text-text-secondary">We'll connect the domain and issue a free SSL certificate (Let's Encrypt).</p>
+              <p className="text-sm text-text-secondary">Connect a domain and issue a free SSL certificate (Let's Encrypt).</p>
               <div>
                 <label className="text-sm text-text-secondary block mb-1.5">Domain</label>
                 <input
@@ -204,25 +211,48 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
                   Redirect <span className="font-mono text-text-primary">www</span> → <span className="font-mono text-text-primary">{domain || 'example.com'}</span>
                 </label>
               )}
-              <p className="text-xs text-text-muted">{www ? 'Requires that www.* also points (A-record) to this server. ' : ''}We'll check DNS → create the nginx config → issue the certificate → reload nginx.</p>
+              {www && <p className="text-xs text-text-muted">Requires that <span className="font-mono">www.*</span> also points (A-record) to this server.</p>}
+            </div>
+          )}
+
+          {/* Step 4 — Confirm */}
+          {step === 4 && (
+            <div className="space-y-4">
+              <img src={panicMeme} alt="" className="w-full max-w-[280px] mx-auto rounded-xl border border-border shadow-lg" />
+
+              <div className="bg-bg-secondary/60 border border-border rounded-lg p-3 space-y-1.5 text-sm">
+                <div className="flex justify-between gap-2"><span className="text-text-muted">Site</span><span className="text-text-primary font-medium">{name}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-text-muted">Domain</span><span className="text-text-primary font-mono">{domain}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-text-muted">www</span><span className="text-text-primary">{www ? (redirectWww ? `redirects → ${domain}` : 'serves the site') : 'off'}</span></div>
+              </div>
+
+              <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-lg p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-accent-yellow shrink-0 mt-0.5" />
+                <p className="text-xs text-text-secondary">
+                  We'll verify DNS, create the nginx config, request a <strong>real Let's Encrypt certificate</strong> (counts toward rate limits), and reload nginx. Make sure DNS is set first, or issuance will fail.
+                </p>
+              </div>
+
+              <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
+                <input type="checkbox" checked={dnsAck} onChange={e => setDnsAck(e.target.checked)} className="accent-accent-blue w-4 h-4 mt-0.5" />
+                <span>I confirm that <span className="font-mono text-text-primary">{domain}</span>{www ? <> and <span className="font-mono text-text-primary">www.{domain}</span></> : ''} point to this server (DNS A-record).</span>
+              </label>
+
               {busy && (
-                <div className="flex flex-col items-center gap-3 py-2">
-                  <img src={panicMeme} alt="" className="w-full max-w-xs rounded-xl border border-border shadow-lg" />
-                  <div className="flex items-center gap-2 text-sm text-accent-blue"><Loader2 className="w-4 h-4 animate-spin" /> Setting up domain &amp; SSL… (can take up to a minute)</div>
-                </div>
+                <div className="flex items-center gap-2 text-sm text-accent-blue"><Loader2 className="w-4 h-4 animate-spin" /> Setting up domain &amp; SSL… (can take up to a minute)</div>
               )}
               {domainResult && <StepLog result={domainResult} />}
             </div>
           )}
 
-          {/* Step 4 */}
-          {step === 4 && (
+          {/* Step 5 — Done */}
+          {step === 5 && (
             <div className="flex flex-col items-center text-center py-6 gap-3">
               <PartyPopper className="w-12 h-12 text-accent-green" />
-              <h3 className="text-lg font-semibold text-text-primary">Site published!</h3>
-              <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline flex items-center gap-1 font-mono">
-                <Globe className="w-4 h-4" /> https://{domain}
-              </a>
+              <h3 className="text-lg font-semibold text-text-primary">{domain ? 'Site published!' : 'Site created!'}</h3>
+              {domain
+                ? <a href={`https://${domain}`} target="_blank" rel="noopener noreferrer" className="text-accent-cyan hover:underline flex items-center gap-1 font-mono"><Globe className="w-4 h-4" /> https://{domain}</a>
+                : <p className="text-sm text-text-muted">You can connect a domain later from the site card.</p>}
               <p className="text-sm text-text-muted">You can edit files from the site card anytime.</p>
             </div>
           )}
@@ -231,7 +261,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
         {/* Footer */}
         <div className="border-t border-border p-4 shrink-0 flex items-center justify-between">
           <button onClick={onClose} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors">
-            {step === 4 ? 'Close' : 'Cancel'}
+            {step === 5 ? 'Close' : 'Cancel'}
           </button>
           <div className="flex items-center gap-2">
             {step === 1 && (
@@ -249,13 +279,21 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
             )}
             {step === 3 && (
               <>
-                <button onClick={() => setStep(4)} disabled={busy} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Skip</button>
-                <button onClick={doDomain} disabled={busy || !domain.trim()} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />} Connect
+                <button onClick={() => setStep(5)} disabled={busy} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Skip</button>
+                <button onClick={goConfirm} disabled={busy || !domain.trim()} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
+                  <ArrowRight className="w-4 h-4" /> Review
                 </button>
               </>
             )}
             {step === 4 && (
+              <>
+                <button onClick={() => { setStep(3); setDomainResult(null) }} disabled={busy} className="flex items-center gap-1.5 px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"><ArrowLeft className="w-4 h-4" /> Back</button>
+                <button onClick={doDomain} disabled={busy || !dnsAck} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-blue hover:bg-accent-blue/90 text-white rounded-lg transition-colors disabled:opacity-50">
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Publish
+                </button>
+              </>
+            )}
+            {step === 5 && (
               <button onClick={onDone} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-accent-green hover:bg-accent-green/90 text-white rounded-lg transition-colors">
                 <CheckCircle className="w-4 h-4" /> Done
               </button>
