@@ -25,6 +25,7 @@ export interface SiteMeta {
   name: string
   domain: string
   www: boolean
+  redirectWww?: boolean
   ssl: boolean
   createdAt: string
 }
@@ -263,14 +264,8 @@ export async function uploadZip(slug: string, tmpZipPath: string, mode: 'replace
 }
 
 // ── Domain + SSL ──────────────────────────────────────────────────────────
-function nginxConfig(slug: string, domain: string, www: boolean): string {
-  const names = www ? `${domain} www.${domain}` : domain
-  return `server {
-    listen 80;
-    listen [::]:80;
-    server_name ${names};
-
-    root ${siteRootOf(slug)};
+function siteServeBlock(slug: string): string {
+  return `    root ${siteRootOf(slug)};
     index index.html;
 
     location / {
@@ -284,74 +279,168 @@ function nginxConfig(slug: string, domain: string, www: boolean): string {
 
     location = /index.html {
         add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
+    }`
+}
+
+function sslLines(domain: string): string {
+  return `    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;`
+}
+
+// HTTP-only config, used to bootstrap a brand-new domain so certbot's http-01
+// challenge can be served before a certificate exists.
+function bootstrapConfig(slug: string, domain: string, www: boolean): string {
+  const names = www ? `${domain} www.${domain}` : domain
+  return `server {
+    listen 80;
+    listen [::]:80;
+    server_name ${names};
+
+${siteServeBlock(slug)}
 }
 `
 }
 
-export async function setupDomain(slug: string, domainInput: string, wantWww: boolean): Promise<StepResult> {
+// Final config with SSL. Three shapes:
+//  - no www: apex only
+//  - www, no redirect: apex + www both serve the site
+//  - www + redirect: www.* 301 -> apex, apex serves the site
+function finalConfig(slug: string, domain: string, www: boolean, redirectWww: boolean): string {
+  const serve = siteServeBlock(slug)
+  const ssl = sslLines(domain)
+
+  if (www && redirectWww) {
+    return `server {
+    listen 80;
+    listen [::]:80;
+    server_name ${domain} www.${domain};
+    return 301 https://${domain}$request_uri;
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name www.${domain};
+${ssl}
+    return 301 https://${domain}$request_uri;
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${domain};
+${ssl}
+
+${serve}
+}
+`
+  }
+
+  const names = www ? `${domain} www.${domain}` : domain
+  const httpRedirectTarget = www ? 'https://$host$request_uri' : `https://${domain}$request_uri`
+  return `server {
+    listen 80;
+    listen [::]:80;
+    server_name ${names};
+    return 301 ${httpRedirectTarget};
+}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${names};
+${ssl}
+
+${serve}
+}
+`
+}
+
+export async function setupDomain(slug: string, domainInput: string, wantWww: boolean, redirectWww: boolean): Promise<StepResult> {
   const steps: StepResult['steps'] = []
   const meta = await getMeta(slug)
   if (!meta) return { steps, success: false, error: 'Site not found' }
 
   const domain = String(domainInput || '').trim().toLowerCase()
   if (!DOMAIN_RE.test(domain)) return { steps, success: false, error: 'Invalid domain name' }
+  const www = !!wantWww
+  const doRedirect = www && !!redirectWww
 
   // 1. DNS precheck
   const serverIp = await getServerIp()
-  let www = wantWww
-  try {
-    const ips = await dnsResolve4(domain).catch(() => [] as string[])
-    const apexOk = serverIp ? ips.includes(serverIp) : ips.length > 0
-    let wwwNote = ''
-    if (www) {
-      const wwwIps = await dnsResolve4(`www.${domain}`).catch(() => [] as string[])
-      const wwwOk = serverIp ? wwwIps.includes(serverIp) : wwwIps.length > 0
-      if (!wwwOk) { www = false; wwwNote = ' · www.* does not resolve here → skipping www' }
+  const apexIps = await dnsResolve4(domain).catch(() => [] as string[])
+  const apexOk = serverIp ? apexIps.includes(serverIp) : apexIps.length > 0
+  if (!apexOk) {
+    return {
+      steps: [{ name: 'dns', success: false, output: `${domain} → ${apexIps.join(', ') || 'no A-record'}${serverIp ? ` (server is ${serverIp})` : ''}` }],
+      success: false,
+      error: `Domain "${domain}" does not point to this server. Add a DNS A-record ${domain} → ${serverIp || 'this server'}, wait for it to propagate, then try again.`,
     }
-    if (!apexOk) {
+  }
+
+  // www requested but not pointing here → STOP with guidance (don't silently drop it)
+  if (www) {
+    const wwwIps = await dnsResolve4(`www.${domain}`).catch(() => [] as string[])
+    const wwwOk = serverIp ? wwwIps.includes(serverIp) : wwwIps.length > 0
+    if (!wwwOk) {
       return {
-        steps: [{ name: 'dns', success: false, output: `${domain} → ${ips.join(', ') || 'no A record'}${serverIp ? ` (server is ${serverIp})` : ''}` }],
+        steps: [
+          { name: 'dns', success: true, output: `${domain} → ${apexIps.join(', ')} ✓` },
+          { name: 'dns: www', success: false, output: `www.${domain} → ${wwwIps.join(', ') || 'no A-record'}${serverIp ? ` (server is ${serverIp})` : ''}` },
+        ],
         success: false,
-        error: `Domain does not point to this server. Add an A-record for ${domain} → ${serverIp || 'this server'} and try again.`,
+        error: `"www" is enabled, but www.${domain} does not point to this server. Choose one:\n` +
+          `  1) Add a DNS A-record (or CNAME) www.${domain} → ${serverIp || 'this server'}, wait for it to propagate, then retry;\n` +
+          `  2) Uncheck "www" to publish ${domain} only (you can add www later).`,
       }
     }
-    steps.push({ name: 'dns', success: true, output: `${domain} → ${ips.join(', ')}${serverIp ? ` ✓ matches server (${serverIp})` : ''}${wwwNote}` })
-  } catch (e: any) {
-    steps.push({ name: 'dns', success: false, output: e?.message || 'DNS check failed' })
   }
+  steps.push({ name: 'dns', success: true, output: `${domain}${www ? ` + www.${domain}` : ''} → ${apexIps.join(', ')}${serverIp ? ` ✓ matches server (${serverIp})` : ''}` })
 
-  // 2. Write nginx config + enable
   const availPath = path.join(NGINX_AVAILABLE, `static-${slug}`)
   const enabledPath = path.join(NGINX_ENABLED, `static-${slug}`)
-  try {
-    await fs.writeFile(availPath, nginxConfig(slug, domain, www), 'utf-8')
-    await execCmd(`ln -sf ${availPath} ${enabledPath}`)
-    steps.push({ name: 'nginx config', success: true, output: `Wrote ${availPath}` })
-  } catch (e: any) {
-    return { steps, success: false, error: `Failed to write nginx config: ${e?.message}` }
+  const certExists = await fs.access(`/etc/letsencrypt/live/${domain}/fullchain.pem`).then(() => true).catch(() => false)
+
+  // 2. Bootstrap (only for a brand-new cert — keeps existing site up on re-runs)
+  if (!certExists) {
+    try {
+      await fs.writeFile(availPath, bootstrapConfig(slug, domain, www), 'utf-8')
+      await execCmd(`ln -sf ${availPath} ${enabledPath}`)
+    } catch (e: any) {
+      return { steps, success: false, error: `Failed to write nginx config: ${e?.message}` }
+    }
+    const test = await execCmd('nginx -t 2>&1')
+    if (!test.success) {
+      await execCmd(`rm -f ${enabledPath} ${availPath}`)
+      steps.push({ name: 'nginx test', success: false, output: test.output })
+      return { steps, success: false, error: 'nginx config test failed (rolled back)' }
+    }
+    await execCmd('systemctl reload nginx')
+    steps.push({ name: 'nginx (http)', success: true, output: 'Bootstrapped HTTP config for certificate validation' })
   }
 
-  // 3. Test + reload nginx
-  const test = await execCmd('nginx -t 2>&1')
-  steps.push({ name: 'nginx test', success: test.success, output: test.output })
-  if (!test.success) {
-    await execCmd(`rm -f ${enabledPath}`) // rollback enable
-    return { steps, success: false, error: 'nginx config test failed (rolled back)' }
-  }
-  await execCmd('systemctl reload nginx')
-
-  // 4. Certbot (Let's Encrypt) — HTTP→HTTPS redirect
+  // 3. Obtain/expand the certificate (certonly: we manage the serving config ourselves)
   const dFlags = www ? `-d ${domain} -d www.${domain}` : `-d ${domain}`
-  const certbot = await execCmd(`certbot --nginx ${dFlags} --non-interactive --agree-tos -m ${CERTBOT_EMAIL} --redirect 2>&1`)
+  const certbot = await execCmd(`certbot certonly --nginx --cert-name ${domain} ${dFlags} --non-interactive --agree-tos -m ${CERTBOT_EMAIL} --expand --keep-until-expiring 2>&1`)
   steps.push({ name: 'ssl certificate', success: certbot.success, output: certbot.output })
   if (!certbot.success) {
-    await updateMeta(slug, { domain, www, ssl: false })
-    return { steps, success: false, error: 'Certificate issuance failed. The site is live over HTTP; check that the domain resolves and rate limits are not hit.' }
+    await updateMeta(slug, { domain, www, redirectWww: doRedirect, ssl: false })
+    return { steps, success: false, error: 'Certificate issuance failed. Check that the domain resolves to this server and Let\'s Encrypt rate limits are not hit.' }
+  }
+
+  // 4. Write the final SSL config (with optional www→apex redirect)
+  const prevConfig = await fs.readFile(availPath, 'utf-8').catch(() => '')
+  await fs.writeFile(availPath, finalConfig(slug, domain, www, doRedirect), 'utf-8')
+  await execCmd(`ln -sf ${availPath} ${enabledPath}`)
+  const test2 = await execCmd('nginx -t 2>&1')
+  steps.push({ name: 'nginx config', success: test2.success, output: test2.success ? `${doRedirect ? 'www → ' + domain + ' redirect, ' : ''}HTTPS enabled` : test2.output })
+  if (!test2.success) {
+    if (prevConfig) await fs.writeFile(availPath, prevConfig, 'utf-8') // restore previous working config
+    await execCmd('systemctl reload nginx')
+    return { steps, success: false, error: 'Final nginx config test failed (restored previous config).' }
   }
   await execCmd('systemctl reload nginx')
 
-  await updateMeta(slug, { domain, www, ssl: true })
+  await updateMeta(slug, { domain, www, redirectWww: doRedirect, ssl: true })
   steps.push({ name: 'done', success: true, output: `https://${domain} is live` })
   return { steps, success: true }
 }

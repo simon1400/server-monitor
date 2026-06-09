@@ -67,12 +67,12 @@ export function uploadZip(
   })
 }
 
-export async function setupDomain(slug: string, domain: string, www: boolean): Promise<StepResult> {
+export async function setupDomain(slug: string, domain: string, www: boolean, redirectWww: boolean): Promise<StepResult> {
   try {
     const res = await fetch(`${API}/sites/${slug}/domain`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ domain, www }),
+      body: JSON.stringify({ domain, www, redirectWww }),
     })
     return await res.json()
   } catch {

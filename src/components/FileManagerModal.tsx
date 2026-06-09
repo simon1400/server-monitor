@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   X, Folder, FileText, ChevronRight, Home, Upload, FolderPlus, RotateCw,
-  Trash2, Download, Pencil, Save, Loader2, ArrowLeft,
+  Trash2, Download, Pencil, Save, Loader2, ArrowLeft, ArrowUp,
 } from 'lucide-react'
 import {
   listFiles, readFile, writeFile, uploadFiles, makeDir, renameEntry, deleteFile, downloadUrl,
@@ -186,7 +186,15 @@ export default function FileManagerModal({ slug, siteName, onClose }: Props) {
             {/* Toolbar */}
             <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0 flex-wrap">
               <div className="flex items-center gap-1 text-sm min-w-0 flex-1 overflow-x-auto">
-                <button onClick={() => load('')} className="p-1 rounded hover:bg-bg-secondary text-text-muted hover:text-text-primary shrink-0"><Home className="w-4 h-4" /></button>
+                <button
+                  onClick={() => load(crumbs.slice(0, -1).join('/'))}
+                  disabled={!cwd}
+                  title="Up one level"
+                  className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-accent-blue transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-text-muted"
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </button>
+                <button onClick={() => load('')} title="Root" className="p-1 rounded hover:bg-bg-secondary text-text-muted hover:text-text-primary shrink-0"><Home className="w-4 h-4" /></button>
                 {crumbs.map((c, i) => (
                   <span key={i} className="flex items-center gap-1 shrink-0">
                     <ChevronRight className="w-3 h-3 text-text-muted" />

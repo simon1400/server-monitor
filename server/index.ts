@@ -260,8 +260,8 @@ app.post('/api/hosting/sites/:slug/domain', async (req, res) => {
   req.setTimeout(600000)
   res.setTimeout(600000)
   try {
-    const { domain, www } = req.body
-    const result = await setupDomain(req.params.slug, domain, www !== false)
+    const { domain, www, redirectWww } = req.body
+    const result = await setupDomain(String(req.params.slug), domain, www !== false, redirectWww === true)
     res.json(result)
   } catch (e: any) {
     res.status(500).json({ success: false, steps: [], error: e?.message || 'Domain setup failed' })

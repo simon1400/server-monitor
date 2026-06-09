@@ -37,6 +37,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
   const [name, setName] = useState('')
   const [domain, setDomain] = useState('')
   const [www, setWww] = useState(true)
+  const [redirectWww, setRedirectWww] = useState(true)
   const [slug, setSlug] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,7 +75,7 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
     setError(null)
     setBusy(true)
     setDomainResult(null)
-    const res = await setupDomain(slug, domain.trim(), www)
+    const res = await setupDomain(slug, domain.trim(), www, redirectWww)
     setDomainResult(res)
     setBusy(false)
     if (res.success) setTimeout(() => setStep(4), 700)
@@ -197,7 +198,13 @@ export default function NewSiteWizard({ onClose, onDone }: Props) {
                 <input type="checkbox" checked={www} onChange={e => setWww(e.target.checked)} className="accent-accent-blue w-4 h-4" />
                 Also connect <span className="font-mono text-text-primary">www.{domain || 'example.com'}</span>
               </label>
-              <p className="text-xs text-text-muted">We'll check DNS → create the nginx config → issue the certificate → reload nginx.</p>
+              {www && (
+                <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer pl-6">
+                  <input type="checkbox" checked={redirectWww} onChange={e => setRedirectWww(e.target.checked)} className="accent-accent-blue w-4 h-4" />
+                  Redirect <span className="font-mono text-text-primary">www</span> → <span className="font-mono text-text-primary">{domain || 'example.com'}</span>
+                </label>
+              )}
+              <p className="text-xs text-text-muted">{www ? 'Requires that www.* also points (A-record) to this server. ' : ''}We'll check DNS → create the nginx config → issue the certificate → reload nginx.</p>
               {busy && (
                 <div className="flex flex-col items-center gap-3 py-2">
                   <img src={panicMeme} alt="" className="w-full max-w-xs rounded-xl border border-border shadow-lg" />

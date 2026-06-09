@@ -3,6 +3,7 @@ export interface ManagedSite {
   name: string
   domain: string
   www: boolean
+  redirectWww?: boolean
   ssl: boolean
   createdAt: string
   exists: boolean

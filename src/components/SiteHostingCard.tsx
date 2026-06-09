@@ -31,6 +31,7 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
   const [uploadResult, setUploadResult] = useState<StepResult | null>(null)
   const [domain, setDomain] = useState(site.domain)
   const [www, setWww] = useState(site.www)
+  const [redirectWww, setRedirectWww] = useState(site.redirectWww ?? true)
   const [domainBusy, setDomainBusy] = useState(false)
   const [domainResult, setDomainResult] = useState<StepResult | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -54,7 +55,7 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
     if (!domain.trim()) return
     setDomainBusy(true)
     setDomainResult(null)
-    const res = await setupDomain(site.slug, domain.trim(), www)
+    const res = await setupDomain(site.slug, domain.trim(), www, redirectWww)
     setDomainBusy(false)
     setDomainResult(res)
     if (res.success) setTimeout(onAction, 1500)
@@ -150,6 +151,12 @@ export default function SiteHostingCard({ site, onAction }: { site: ManagedSite;
                 {site.ssl ? 'Renew SSL' : 'Connect'}
               </button>
             </div>
+            {www && (
+              <label className="flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer mt-2">
+                <input type="checkbox" checked={redirectWww} onChange={e => setRedirectWww(e.target.checked)} className="accent-accent-blue w-4 h-4" />
+                Redirect <span className="font-mono text-text-primary">www</span> → <span className="font-mono text-text-primary">{domain || 'domain'}</span>
+              </label>
+            )}
             {domainBusy && <p className="text-xs text-text-muted mt-2 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Setting up… (up to a minute)</p>}
             {domainResult && <div className="mt-3"><StepLog result={domainResult} /></div>}
           </div>
