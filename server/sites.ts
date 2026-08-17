@@ -11,6 +11,35 @@ const CUSTOM_CHECK_PATHS: Record<string, string> = {
   'api.pellwood.com': '/order',
 }
 
+// Checking 40+ domains at once saturates sockets/DNS and makes everything
+// time out simultaneously — a false "all sites are down" wave.
+const CHECK_CONCURRENCY = 6
+const HTTP_RETRIES = 1
+const RETRY_DELAY_MS = 2000
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++
+      results[i] = await fn(items[i])
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
+// TLS/socket level errors mean "could not reach the host", not "bad certificate"
+const UNREACHABLE_CODES = ['Timeout', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'ETIMEDOUT', 'EPIPE']
+
+function isUnreachableError(message: string | null): boolean {
+  if (!message) return false
+  return UNREACHABLE_CODES.some(code => message.includes(code))
+}
+
 export interface SiteStatus {
   domain: string
   httpStatus: number | null
@@ -23,6 +52,9 @@ export interface SiteStatus {
     notAfter: string
     daysLeft: number
     error: string | null
+    // false = TLS connection never completed (host unreachable), so the
+    // certificate itself is unknown — not a reason to alert about SSL
+    reachable: boolean
   } | null
   error: string | null
 }
@@ -39,7 +71,8 @@ export async function getNginxDomains(): Promise<string[]> {
   }
 }
 
-export function checkHttp(domain: string): Promise<{ status: number | null; time: number; error: string | null }> {
+// Single attempt. Use checkHttp() — it retries transient failures.
+function checkHttpOnce(domain: string): Promise<{ status: number | null; time: number; error: string | null }> {
   return new Promise((resolve) => {
     const start = Date.now()
     const path = CUSTOM_CHECK_PATHS[domain] || '/'
@@ -76,6 +109,16 @@ export function checkHttp(domain: string): Promise<{ status: number | null; time
   })
 }
 
+// A single blip should never be reported as downtime — retry before giving up.
+export async function checkHttp(domain: string): Promise<{ status: number | null; time: number; error: string | null }> {
+  let result = await checkHttpOnce(domain)
+  for (let attempt = 0; attempt < HTTP_RETRIES && result.status === null; attempt++) {
+    await sleep(RETRY_DELAY_MS)
+    result = await checkHttpOnce(domain)
+  }
+  return result
+}
+
 export function checkSSL(domain: string): Promise<SiteStatus['ssl']> {
   return new Promise((resolve) => {
     const socket = tls.connect(
@@ -100,22 +143,23 @@ export function checkSSL(domain: string): Promise<SiteStatus['ssl']> {
               notAfter: notAfter.toISOString(),
               daysLeft,
               error: authorized ? null : String(socket.authorizationError || 'Certificate not trusted'),
+              reachable: true,
             })
           } else {
-            resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: 'No certificate' })
+            resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: 'No certificate', reachable: true })
           }
         } catch {
-          resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: 'Failed to read certificate' })
+          resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: 'Failed to read certificate', reachable: true })
         }
         socket.end()
       }
     )
     socket.on('error', (err) => {
-      resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: err.message })
+      resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: err.message, reachable: !isUnreachableError(err.message) })
     })
     socket.on('timeout', () => {
       socket.destroy()
-      resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: 'Timeout' })
+      resolve({ valid: false, issuer: '', notBefore: '', notAfter: '', daysLeft: 0, error: 'Timeout', reachable: false })
     })
   })
 }
@@ -356,12 +400,10 @@ export async function getProcessHttpStatus(pids: { pm_id: number; pid: number }[
     const uncachedChecks = checksToRun.filter(c => !cachedMap.has(c.domain))
 
     // For uncached, do quick HTTP checks
-    const freshChecks = await Promise.all(
-      uncachedChecks.map(async (c) => {
-        const httpResult = await checkHttp(c.domain)
-        return { domain: c.domain, status: httpResult.status, ok: httpResult.status !== null && httpResult.status >= 200 && httpResult.status < 400 }
-      })
-    )
+    const freshChecks = await mapLimit(uncachedChecks, CHECK_CONCURRENCY, async (c) => {
+      const httpResult = await checkHttp(c.domain)
+      return { domain: c.domain, status: httpResult.status, ok: httpResult.status !== null && httpResult.status >= 200 && httpResult.status < 400 }
+    })
     const freshMap = new Map(freshChecks.map(c => [c.domain, c]))
 
     for (const { pm_id, domain } of checksToRun) {
@@ -383,6 +425,12 @@ export async function getProcessHttpStatus(pids: { pm_id: number; pid: number }[
 let cachedSites: SiteStatus[] = []
 let lastCheck = 0
 
+// Timestamp of the last *fresh* site sweep. Alerting uses it to avoid counting
+// the same cached result as several consecutive failures.
+export function getSitesLastCheck(): number {
+  return lastCheck
+}
+
 export async function checkAllSites(): Promise<SiteStatus[]> {
   // Cache for 60 seconds
   if (Date.now() - lastCheck < 60000 && cachedSites.length > 0) {
@@ -391,23 +439,21 @@ export async function checkAllSites(): Promise<SiteStatus[]> {
 
   const domains = await getNginxDomains()
 
-  const results = await Promise.all(
-    domains.map(async (domain): Promise<SiteStatus> => {
-      const [httpResult, sslResult] = await Promise.all([
-        checkHttp(domain),
-        checkSSL(domain),
-      ])
+  const results = await mapLimit(domains, CHECK_CONCURRENCY, async (domain): Promise<SiteStatus> => {
+    const [httpResult, sslResult] = await Promise.all([
+      checkHttp(domain),
+      checkSSL(domain),
+    ])
 
-      return {
-        domain,
-        httpStatus: httpResult.status,
-        httpOk: httpResult.status !== null && httpResult.status >= 200 && httpResult.status < 400,
-        responseTime: httpResult.time,
-        ssl: sslResult,
-        error: httpResult.error,
-      }
-    })
-  )
+    return {
+      domain,
+      httpStatus: httpResult.status,
+      httpOk: httpResult.status !== null && httpResult.status >= 200 && httpResult.status < 400,
+      responseTime: httpResult.time,
+      ssl: sslResult,
+      error: httpResult.error,
+    }
+  })
 
   cachedSites = results.sort((a, b) => {
     // Problems first
