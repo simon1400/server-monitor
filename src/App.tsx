@@ -6,6 +6,7 @@ import OverviewPage from './pages/OverviewPage'
 import DiskPage from './pages/DiskPage'
 import ProcessesPage from './pages/ProcessesPage'
 import HostingPage from './pages/HostingPage'
+import BillingPage from './pages/BillingPage'
 import LoginPage from './components/LoginPage'
 import { Loader2 } from 'lucide-react'
 
@@ -60,6 +61,7 @@ function Dashboard() {
           <Route path="/apps" element={<ProcessesPage data={data} onAction={refresh} />} />
           <Route path="/hosting" element={<HostingPage />} />
           <Route path="/disk" element={<DiskPage />} />
+          <Route path="/billing" element={<BillingPage />} />
         </Routes>
       </main>
     </div>

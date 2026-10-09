@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import os from 'os'
-import express from 'express'
+import express, { type Request, type Response } from 'express'
 import cors from 'cors'
 import multer from 'multer'
 import path from 'path'
@@ -12,16 +12,25 @@ import { deployProcess } from './deploy.js'
 import { getProcessEnv, saveProcessEnv } from './env.js'
 import { authMiddleware, login, logout, checkAuth } from './auth.js'
 import {
-  listManagedSites, createSite, updateSiteAdmin, uploadZip, setupDomain, deleteSite,
+  listManagedSites, listSiteSlugs, createSite, updateSiteAdmin, uploadZip, setupDomain, deleteSite,
   listTree, readTextFile, writeTextFile, makeDir, renameEntry, deleteEntry,
   saveUploadedFiles, getDownload,
 } from './hosting.js'
 import { initVapid, getVapidPublicKey, addPushSubscription, removePushSubscription, getNotificationStatus } from './notifications.js'
 import { startAlerting, getAlertStates } from './alerting.js'
+import { billingAuthMiddleware, billingUnlock, billingLock, billingCheck } from './billingAuth.js'
+import {
+  initBilling, BillingError, getSummary, listProjects, createProject, updateProject, archiveProject,
+  listEntries, createEntry, updateEntry, deleteEntry as deleteWorkEntry,
+  listInvoices, createInvoice, updateInvoice, deleteInvoice, invoiceText,
+} from './billing.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// Load .env file
+// Load .env file. Variables:
+//   AUTH_PASSWORD     — dashboard login password (required)
+//   BILLING_PASSWORD  — second password for the Billing tab (billing routes answer 500 without it)
+//   PORT, CERTBOT_EMAIL, TELEGRAM_*, VAPID_* — optional
 try {
   const envPath = path.join(__dirname, '..', '.env')
   const envContent = readFileSync(envPath, 'utf-8')
@@ -37,6 +46,10 @@ try {
 } catch { /* .env not found, using process env */ }
 const app = express()
 const PORT = process.env.PORT || 4400
+
+// nginx on the same host proxies to us; trust only a loopback proxy so req.ip is
+// the real client IP and X-Forwarded-For can't be spoofed by direct connections
+app.set('trust proxy', 'loopback')
 
 // Multipart upload (zip & individual files) → temp dir, generous size cap
 const upload = multer({ dest: os.tmpdir(), limits: { fileSize: 350 * 1024 * 1024 } })
@@ -367,6 +380,68 @@ app.delete('/api/hosting/sites/:slug/files', async (req, res) => {
 })
 
 
+// --- Billing (work log → invoices), behind a second password ---
+
+app.use('/api/billing', billingAuthMiddleware)
+app.post('/api/billing/unlock', billingUnlock)
+app.post('/api/billing/lock', billingLock)
+app.get('/api/billing/check', billingCheck)
+
+function qs(v: unknown): string | undefined {
+  return typeof v === 'string' && v !== '' ? v : undefined
+}
+
+function billingRoute(fn: (req: Request) => unknown) {
+  return async (req: Request, res: Response) => {
+    try {
+      res.json(await fn(req))
+    } catch (e) {
+      if (e instanceof BillingError) {
+        res.status(e.status).json({ success: false, error: e.message })
+        return
+      }
+      console.error('[billing] error:', e)
+      res.status(500).json({ success: false, error: 'Billing operation failed' })
+    }
+  }
+}
+
+app.get('/api/billing/summary', billingRoute(req => getSummary(req.query.archived === '1')))
+
+app.get('/api/billing/projects', billingRoute(req => listProjects(req.query.archived === '1')))
+app.post('/api/billing/projects', billingRoute(async req => ({ success: true, project: await createProject(req.body) })))
+app.get('/api/billing/projects/meta', billingRoute(async () => {
+  const [processes, sites] = await Promise.all([
+    getPM2Processes().then(list => [...new Set(list.map(p => p.name))].sort()).catch(() => [] as string[]),
+    listSiteSlugs().catch(() => [] as string[]),
+  ])
+  return { processes, sites }
+}))
+app.patch('/api/billing/projects/:id', billingRoute(async req => ({ success: true, project: await updateProject(String(req.params.id), req.body) })))
+app.delete('/api/billing/projects/:id', billingRoute(async req => ({ success: true, project: await archiveProject(String(req.params.id)) })))
+
+app.get('/api/billing/entries', billingRoute(req => listEntries({
+  projectId: qs(req.query.projectId), status: qs(req.query.status),
+  from: qs(req.query.from), to: qs(req.query.to), q: qs(req.query.q),
+})))
+app.post('/api/billing/entries', billingRoute(async req => ({ success: true, entry: await createEntry(req.body) })))
+app.patch('/api/billing/entries/:id', billingRoute(async req => ({ success: true, entry: await updateEntry(String(req.params.id), req.body) })))
+app.delete('/api/billing/entries/:id', billingRoute(async req => { await deleteWorkEntry(String(req.params.id)); return { success: true } }))
+
+app.get('/api/billing/invoices', billingRoute(req => listInvoices({ projectId: qs(req.query.projectId), status: qs(req.query.status) })))
+app.post('/api/billing/invoices', billingRoute(async req => ({ success: true, invoice: await createInvoice(req.body) })))
+app.patch('/api/billing/invoices/:id', billingRoute(async req => ({ success: true, invoice: await updateInvoice(String(req.params.id), req.body) })))
+app.delete('/api/billing/invoices/:id', billingRoute(async req => ({ success: true, ...(await deleteInvoice(String(req.params.id))) })))
+app.get('/api/billing/invoices/:id/text', async (req, res) => {
+  try {
+    res.type('text/plain; charset=utf-8').send(invoiceText(String(req.params.id)))
+  } catch (e) {
+    const status = e instanceof BillingError ? e.status : 500
+    res.status(status).json({ success: false, error: e instanceof BillingError ? e.message : 'Failed to build invoice text' })
+  }
+})
+
+
 // --- Notification endpoints ---
 
 // Get VAPID public key (needed by frontend to subscribe)
@@ -427,6 +502,9 @@ if (process.env.NODE_ENV === 'production') {
 
 // Start history collection (every 30s)
 startSystemHistoryCollection()
+
+// Load billing data (a corrupt file only disables billing routes)
+initBilling()
 
 // Init notifications & alerting
 initVapid()

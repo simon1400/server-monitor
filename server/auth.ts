@@ -6,7 +6,7 @@ const sessions = new Set<string>()
 const COOKIE_NAME = 'sm_session'
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 days
 
-function parseCookies(req: Request): Record<string, string> {
+export function parseCookies(req: Request): Record<string, string> {
   const header = req.headers.cookie || ''
   return Object.fromEntries(
     header.split(';').map(c => {
@@ -14,6 +14,16 @@ function parseCookies(req: Request): Record<string, string> {
       return [key, rest.join('=')]
     })
   )
+}
+
+// Returns the main session token if the request carries a valid one
+export function getValidSession(req: Request): string | null {
+  const token = parseCookies(req)[COOKIE_NAME]
+  return token && sessions.has(token) ? token : null
+}
+
+export function isSessionValid(token: string): boolean {
+  return sessions.has(token)
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {

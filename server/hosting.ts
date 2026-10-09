@@ -168,6 +168,11 @@ async function getServerIp(): Promise<string | null> {
 }
 
 // ── Site management ───────────────────────────────────────────────────────
+// Cheap slug list (no disk/HTTP checks) — used by the billing project picker
+export async function listSiteSlugs(): Promise<string[]> {
+  return (await readRegistry()).map(m => m.slug).sort()
+}
+
 export async function listManagedSites(): Promise<ManagedSite[]> {
   const metas = await readRegistry()
   return Promise.all(metas.map(async (m): Promise<ManagedSite> => {
